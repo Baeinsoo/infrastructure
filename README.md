@@ -84,3 +84,28 @@ kubectl get validatingwebhookconfigurations ingress-nginx-admission
 
 # 4. Ingress 적용
 kubectl apply -f k8s/local-k8s/ingress.yaml
+
+
+
+```
+## Kubernetes 서비스/Ingress 개념 요약
+
+- ClusterIP 서비스
+    - 클러스터 내부에서만 접근 가능한 서비스 타입
+    - Ingress가 내부에서 접근할 대상(Target)으로 가장 많이 사용됨
+    - 외부 노출이 필요 없는 백엔드 서비스들 전용
+
+- Ingress + Ingress Controller
+    - Ingress 리소스(YAML)는 단순 명세
+    - Ingress Controller(Pod)가 이를 읽어 실제 라우팅(NGINX 설정 등) 구성
+    - Ingress Controller 자체는 보통 Service(LoadBalancer / NodePort)로 외부 트래픽을 받음
+    - 참고 파일: `k8s/local-k8s/ingress.yaml`, `k8s/local-k8s/ingress-nginx-deploy.yaml`
+
+- 외부 노출 방식
+    - Ingress Controller의 Service 타입이 아래 중 하나
+        - LoadBalancer → 클라우드 로드밸런서를 통해 외부 트래픽 유입
+        - NodePort → 클러스터 노드의 포트를 통해 외부 접근 가능
+        - (일부 환경에서는 HostPort, HostNetwork, 혹은 MetalLB 같은 L2 로드밸런서 사용)
+
+- Ingress 파일 자체는 명세
+    - 직접 트래픽을 흘려주지 않고, "어떤 경로 → 어떤 서비스"로 연결할지 선언
