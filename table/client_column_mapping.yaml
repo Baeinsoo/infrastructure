@@ -69,3 +69,18 @@ mappings:
       - hp_cost
       - mp_cost
     filters: {}
+
+  - name: Item
+    importPath: "../source/Item.xlsx"
+    exportPath: "../output/client"
+    sourceColumns:
+      - code
+      - name
+      - description
+      - skin_code
+    targetColumns:
+      - code
+      - name
+      - description
+      - skinCode
+    filters: {}
