@@ -1,0 +1,71 @@
+mappings:
+  - name: Character
+    importPath: "../source/Character.xlsx"
+    exportPath: "../output/client"
+    sourceColumns:
+      - code
+      - name
+      - speed
+      - jump_power
+      - description
+      - default_skin_code
+    targetColumns:
+      - code
+      - name
+      - speed
+      - jump_power
+      - description
+      - defaultSkinCode
+    filters: {}
+      # Age: "value > 18"
+      # Country: "value != 'Unknown'"
+      
+  - name: Skin
+    importPath: "../source/Skin.xlsx"
+    exportPath: "../output/client"
+    sourceColumns:
+      - code
+      - name
+      - description
+    targetColumns:
+      - code
+      - name
+      - description
+    filters: {}
+  - name: SkinAsset
+    importPath: "../source/SkinAsset.xlsx"
+    exportPath: "../output/client"
+    sourceColumns:
+      - code
+      - skin_code
+      - model_path
+    targetColumns:
+      - code
+      - skinCode
+      - modelPath
+    filters: {}
+
+  - name: Action
+    importPath: "../source/Action.xlsx"
+    exportPath: "../output/client"
+    sourceColumns:
+      - code
+      - name
+      - description
+      - class
+      - duration
+      - cast_time
+      - cooldown
+      - hp_cost
+      - mp_cost
+    targetColumns:
+      - code
+      - name
+      - description
+      - class
+      - duration
+      - cast_time
+      - cooldown
+      - hp_cost
+      - mp_cost
+    filters: {}
