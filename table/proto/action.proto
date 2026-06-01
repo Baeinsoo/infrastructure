@@ -1,0 +1,19 @@
+syntax = "proto3";
+package LOP.MasterData;
+import "lop_options.proto";
+
+message Action {
+  string code        = 1 [(lop.unique) = true, (lop.required) = true];
+  string name        = 2 [(lop.required) = true];
+  string description = 3 [(lop.side)    = "client"];
+  string category    = 4 [(lop.required) = true];
+  float  duration    = 5 [(lop.range)   = "0,60"];
+  float  cast_time   = 6 [(lop.range)   = "0,60"];
+  float  cooldown    = 7 [(lop.range)   = "0,300"];
+  float  hp_cost     = 8 [(lop.range)   = "0,9999"];
+  float  mp_cost     = 9 [(lop.range)   = "0,9999"];
+}
+
+message ActionTable {
+  repeated Action entries = 1;
+}

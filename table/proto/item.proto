@@ -1,0 +1,14 @@
+syntax = "proto3";
+package LOP.MasterData;
+import "lop_options.proto";
+
+message Item {
+  string code        = 1 [(lop.unique) = true, (lop.required) = true];
+  string name        = 2 [(lop.required) = true];
+  string description = 3 [(lop.side)    = "client"];
+  string skin_code   = 4 [(lop.fk)      = "Skin.code"];
+}
+
+message ItemTable {
+  repeated Item entries = 1;
+}

@@ -1,0 +1,22 @@
+syntax = "proto3";
+package lop;
+import "google/protobuf/descriptor.proto";
+
+// Custom field options for LOP MasterData schemas.
+// Read by Slice 2b exporter to drive side projection + build-time validation.
+extend google.protobuf.FieldOptions {
+  // Side projection: "client" | "server" | "both" (생략 시 "both")
+  string side     = 51001;
+
+  // Foreign key reference: "TableName.column" 형식 (예: "Skin.code")
+  string fk       = 51002;
+
+  // 숫자 범위 제약: "min,max" (예: "0,30")
+  string range    = 51003;
+
+  // 빈 값(null/empty string) 금지
+  bool   required = 51004;
+
+  // 테이블 내 unique key
+  bool   unique   = 51005;
+}
