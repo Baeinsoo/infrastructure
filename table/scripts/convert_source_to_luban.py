@@ -26,6 +26,12 @@ TABLES = {
                   "field_groups": {"description": "c"}},
 }
 
+# C# reserved keywords cannot be Luban field names. Normalize per table.
+# (Aligns with the 2a proto decision that renamed Action.class -> category.)
+FIELD_RENAME = {
+    "Action": {"class": "category"},
+}
+
 def read_source(name):
     wb = load_workbook(os.path.join(SRC, f"{name}.xlsx"), data_only=True)
     ws = wb.active
@@ -42,6 +48,8 @@ def read_source(name):
 
 def write_table(name, cfg):
     names, types, data = read_source(name)
+    rename = FIELD_RENAME.get(name, {})
+    names = [rename.get(n, n) for n in names]
     groups = [cfg["field_groups"].get(n, "") for n in names]
     wb = Workbook(); ws = wb.active
     ws.append(["##var"]   + names)
@@ -54,26 +62,40 @@ def write_table(name, cfg):
 
 def write_tables_index():
     wb = Workbook(); ws = wb.active
+    # Luban 4.9.0's built-in __TableRecord__ bean REQUIRES the `output` column
+    # (and accepts `tags`). Canonical header:
+    #   full_name | value_type | read_schema_from_file | input | index | mode | group | comment | tags | output
     ws.append(["##var", "full_name", "value_type", "read_schema_from_file",
-               "input", "index", "mode", "group", "comment"])
+               "input", "index", "mode", "group", "comment", "tags", "output"])
     for name, cfg in TABLES.items():
         ws.append(["", f"Tb{cfg['value_type']}", cfg["value_type"], "TRUE",
-                   f"#{name}.xlsx", cfg["index"], "map", cfg["table_group"], name])
+                   f"#{name}.xlsx", cfg["index"], "map", cfg["table_group"], name, "", ""])
     wb.save(os.path.join(OUT, "__tables__.xlsx"))
 
-def write_empty(fname, header_tag):
+def write_beans_index():
+    """Write an empty __beans__.xlsx with the required Luban 4.9.0 column headers."""
     wb = Workbook(); ws = wb.active
-    ws.append([header_tag])
-    wb.save(os.path.join(OUT, fname))
+    # Luban 4.9.0 ExcelSchemaLoader.LoadBeanListFromFile required columns:
+    ws.append(["##var", "full_name", "parent", "valueType", "sep", "alias",
+               "comment", "tags", "group"])
+    wb.save(os.path.join(OUT, "__beans__.xlsx"))
+
+def write_enums_index():
+    """Write an empty __enums__.xlsx with the required Luban 4.9.0 column headers."""
+    wb = Workbook(); ws = wb.active
+    # Luban 4.9.0 ExcelSchemaLoader.LoadEnumListFromFile required columns:
+    ws.append(["##var", "full_name", "comment", "flags", "group",
+               "tags", "unique"])
+    wb.save(os.path.join(OUT, "__enums__.xlsx"))
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     for name, cfg in TABLES.items():
         write_table(name, cfg)
         print(f"[OK] Datas/#{name}.xlsx")
-    write_tables_index();           print("[OK] Datas/__tables__.xlsx")
-    write_empty("__beans__.xlsx", "##var"); print("[OK] Datas/__beans__.xlsx")
-    write_empty("__enums__.xlsx", "##var"); print("[OK] Datas/__enums__.xlsx")
+    write_tables_index();  print("[OK] Datas/__tables__.xlsx")
+    write_beans_index();   print("[OK] Datas/__beans__.xlsx")
+    write_enums_index();   print("[OK] Datas/__enums__.xlsx")
     print("[DONE]")
 
 if __name__ == "__main__":
