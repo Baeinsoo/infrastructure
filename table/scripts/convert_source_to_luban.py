@@ -26,6 +26,8 @@ TABLES = {
                   "field_groups": {"description": "c"}},
     "StatusEffect": {"value_type": "StatusEffect", "index": "id", "table_group": "",
                      "field_groups": {"description": "c"}},
+    "Ability":   {"value_type": "Ability", "index": "id", "table_group": "",
+                  "field_groups": {"description": "c"}},
 }
 
 # C# reserved keywords cannot be Luban field names. Normalize per table.
