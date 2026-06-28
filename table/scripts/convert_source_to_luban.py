@@ -26,8 +26,10 @@ TABLES = {
                   "field_groups": {"description": "c"}},
     "StatusEffect": {"value_type": "StatusEffect", "index": "id", "table_group": "",
                      "field_groups": {"description": "c"}},
-    "Ability":   {"value_type": "Ability", "index": "id", "table_group": "",
-                  "field_groups": {"description": "c"}},
+    # Ability는 다형 effects 리스트(타입별 AbilityEffect)라 평면 흐름 밖이다.
+    #   - effect bean 계층 = write_beans_index()가 __beans__에 정의
+    #   - TbAbility 등록 = write_tables_index()가 명시 append
+    #   - 데이터(#Ability.xlsx) = Luban embedded 형식으로 수기 author(평면 source 없음)
 }
 
 # C# reserved keywords cannot be Luban field names. Normalize per table.
@@ -74,14 +76,37 @@ def write_tables_index():
     for name, cfg in TABLES.items():
         ws.append(["", f"Tb{cfg['value_type']}", cfg["value_type"], "TRUE",
                    f"#{name}.xlsx", cfg["index"], "map", cfg["table_group"], name, "", ""])
+    # Ability: 다형 effects 리스트 → 평면 흐름 밖. #Ability.xlsx는 수기 author(Luban embedded).
+    ws.append(["", "TbAbility", "Ability", "TRUE", "#Ability.xlsx", "id", "map", "", "Ability", "", ""])
     wb.save(os.path.join(OUT, "__tables__.xlsx"))
 
 def write_beans_index():
-    """Write an empty __beans__.xlsx with the required Luban 4.9.0 column headers."""
+    """
+    __beans__.xlsx — 다형 AbilityEffect 계층 정의.
+    어빌리티의 effects 리스트가 담는 타입들(base + 구체 effect). 자식이 parent를 가리키면 base는 자동 abstract.
+    필드는 `*fields` 멀티컬럼 그룹(서브헤더 name/alias/type/...)에 인라인 — 헤더 셀은 *반드시 병합*(J1:P1).
+    필드가 여러 개인 bean(DamageEffect)은 첫 행에 full_name + 첫 필드, 이어지는 행은 full_name 비우고
+    필드만(같은 bean의 *fields 리스트에 이어붙음 = Luban 다행 연속 표기).
+    """
     wb = Workbook(); ws = wb.active
-    # Luban 4.9.0 ExcelSchemaLoader.LoadBeanListFromFile required columns:
-    ws.append(["##var", "full_name", "parent", "valueType", "sep", "alias",
-               "comment", "tags", "group"])
+    ws.append(["##var", "full_name", "parent", "valueType", "alias", "sep",
+               "comment", "tags", "group", "*fields", "", "", "", "", "", ""])
+    ws.append(["##var", "", "", "", "", "", "", "", "",
+               "name", "alias", "type", "group", "comment", "tags", "variants"])
+    ws.append(["", "AbilityEffect", "", "", "", "", "polymorphic base", "", "",
+               "", "", "", "", "", "", ""])
+    ws.append(["", "StatusEffectApplyEffect", "AbilityEffect", "", "", "", "", "", "",
+               "status_effect_id", "", "int", "", "", "", ""])
+    ws.append(["", "MotionEffect", "AbilityEffect", "", "", "", "", "", "",
+               "speed", "", "float", "", "", "", ""])
+    # DamageEffect: 다중 필드(amount/range/angle). 첫 필드만 본 행, 나머지는 연속 행.
+    ws.append(["", "DamageEffect", "AbilityEffect", "", "", "", "데미지 + 부채꼴 타게팅 형상", "", "",
+               "amount", "", "int", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", "", "",
+               "range", "", "float", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", "", "",
+               "angle", "", "float", "", "", "", ""])
+    ws.merge_cells("J1:P1")
     wb.save(os.path.join(OUT, "__beans__.xlsx"))
 
 def write_enums_index():
