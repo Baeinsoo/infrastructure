@@ -20,8 +20,6 @@ TABLES = {
                   "field_groups": {"description": "c"}},
     "SkinAsset": {"value_type": "SkinAsset", "index": "code", "table_group": "c",
                   "field_groups": {}},
-    "Action":    {"value_type": "Action", "index": "code", "table_group": "",
-                  "field_groups": {"description": "c"}},
     "Item":      {"value_type": "Item", "index": "code", "table_group": "",
                   "field_groups": {"description": "c"}},
     "StatusEffect": {"value_type": "StatusEffect", "index": "id", "table_group": "",
@@ -33,9 +31,7 @@ TABLES = {
 }
 
 # C# reserved keywords cannot be Luban field names. Normalize per table.
-# (Aligns with the 2a proto decision that renamed Action.class -> category.)
 FIELD_RENAME = {
-    "Action": {"class": "category"},
 }
 
 def read_source(name):
