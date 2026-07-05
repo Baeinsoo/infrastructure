@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lobby-server-config
+data:
+  NODE_ENV: "development"
+  SPECIFIC_ENV: "local-k8s"
