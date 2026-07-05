@@ -360,12 +360,13 @@ rsync -a --exclude node_modules --exclude dist --exclude prisma --exclude k8s \
 
 - [ ] **Step 2: package.json 수정** — dependencies에서 `@prisma/client` 제거, devDependencies에서 `prisma` 제거, dependencies에 `"@lop/database": "workspace:*"` 추가. scripts는 그대로.
 
-- [ ] **Step 3: tsconfig.json을 base 상속으로 교체** (원본이 lobby와 완전 동일함을 확인했으므로 결과물도 동일):
+- [ ] **Step 3: tsconfig.json을 base 상속으로 교체** (원본이 lobby와 완전 동일함을 확인했으므로 결과물도 동일). **주의: `outDir`을 명시해야 한다** — base의 `outDir`은 base 파일 위치(모노레포 루트) 기준으로 해석돼 산출물이 루트 `dist/`로 새어나감. Task 3에서 확인된 이슈:
 
 ```json
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
+        "outDir": "dist",
         "baseUrl": ".",
         "paths": {
             "@src/*": ["src/*"],
@@ -392,6 +393,8 @@ rsync -a --exclude node_modules --exclude dist --exclude prisma --exclude k8s \
     "exclude": ["node_modules", "src/logs"]
 }
 ```
+
+**의존성 버전 주의 (Task 3에서 확인)**: `package-lock.json`을 제외하고 fresh pnpm install하면 floating `^` 범위가 최신 버전으로 올라가 타입 비호환이 생길 수 있다. 빌드가 타입 에러로 실패하면, 원본 `LeagueOfPhysical-MatchmakingServer/MatchmakingServer/package-lock.json`이 잠갔던 버전으로 해당 패키지를 핀 고정한다 (예: mongoose/mongodb/redis/class-transformer/@types/*). 임의 버전이 아니라 원본이 실제로 쓰던 버전으로.
 
 - [ ] **Step 4: import 치환**
 
@@ -439,12 +442,13 @@ rsync -a --exclude node_modules --exclude dist --exclude prisma --exclude k8s \
 
 - [ ] **Step 2: package.json 수정** — `@prisma/client`·`prisma` 제거, `"@lop/database": "workspace:*"` 추가. (`@kubernetes/client-node`, `portfinder` 등 room 고유 deps는 그대로.)
 
-- [ ] **Step 3: tsconfig.json을 base 상속으로 교체** (room은 `@schedulers` path가 하나 더 있음):
+- [ ] **Step 3: tsconfig.json을 base 상속으로 교체** (room은 `@schedulers` path가 하나 더 있음). **`outDir: "dist"` 명시 필수** (Task 3에서 확인 — base의 outDir은 루트 기준으로 해석됨):
 
 ```json
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
+        "outDir": "dist",
         "baseUrl": ".",
         "paths": {
             "@src/*": ["src/*"],
@@ -472,6 +476,8 @@ rsync -a --exclude node_modules --exclude dist --exclude prisma --exclude k8s \
     "exclude": ["node_modules", "src/logs"]
 }
 ```
+
+**의존성 버전 주의 (Task 3에서 확인)**: `package-lock.json` 제외 후 fresh pnpm install 시 floating `^` 범위가 타입 비호환 최신 버전으로 올라갈 수 있다. 빌드가 타입 에러로 실패하면 원본 `LeagueOfPhysical-RoomServer/RoomServer/package-lock.json`이 잠갔던 버전으로 핀 고정한다.
 
 - [ ] **Step 4: import 치환**
 
@@ -525,6 +531,9 @@ git add -A && git commit -m "feat: migrate room-server into monorepo"
 FROM node:22 AS builder
 RUN corepack enable
 WORKDIR /repo
+# prisma generate는 DB에 접속하진 않지만 datasource가 참조하는 env var가 정의돼 있어야 함.
+# .env는 gitignore되어 빌드 컨텍스트에 없으므로 빌드 전용 placeholder를 주입 (런타임엔 앱이 자체 datasource url로 덮어씀).
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public"
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.base.json ./
 COPY packages/database ./packages/database
 COPY apps/lobby-server ./apps/lobby-server
@@ -549,6 +558,7 @@ CMD ["node", "dist/main.js"]
 FROM node:22 AS builder
 RUN corepack enable
 WORKDIR /repo
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public"
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.base.json ./
 COPY packages/database ./packages/database
 COPY apps/matchmaking-server ./apps/matchmaking-server
@@ -572,6 +582,7 @@ CMD ["node", "dist/main.js"]
 FROM node:22 AS builder
 RUN corepack enable
 WORKDIR /repo
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public"
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.base.json ./
 COPY packages/database ./packages/database
 COPY apps/room-server ./apps/room-server
@@ -593,10 +604,12 @@ CMD ["node", "dist/main.js"]
 
 ```dockerfile
 # docker build -f packages/database/Dockerfile .
-# 실행 시 DATABASE_URL 환경변수 필요 (Phase 1의 PreSync Job이 주입)
+# 런타임 DATABASE_URL은 Phase 1 PreSync Job이 주입. 빌드 시 generate용 placeholder는 아래 ENV.
 FROM node:22
 RUN corepack enable
 WORKDIR /repo
+# 빌드타임 generate 전용 placeholder (런타임엔 Job이 실제 DATABASE_URL로 덮어씀)
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public"
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/database ./packages/database
 RUN pnpm install --frozen-lockfile --filter @lop/database
@@ -667,12 +680,13 @@ infrastructure 레포의 k8s 매니페스트 + ArgoCD가 담당.
 
 ```bash
 cd /Users/insoobae/workspace/LOP/lop-backend
-git clean -xdf -e .env.development.local -e .env.development.local-k8s --dry-run   # 삭제 대상 확인
-git clean -xdf
+# .superpowers는 진행 레저/리뷰 산출물이므로 반드시 보존 (-e). env 파일은 git 추적 중이라 어차피 안 지워짐.
+git clean -xdf -e .superpowers --dry-run   # 삭제 대상 확인 — .superpowers가 목록에 없어야 함
+git clean -xdf -e .superpowers
 pnpm install
 pnpm build
 ```
-Expected: `turbo run build` 4개 패키지 전부 성공. (env 파일은 git 추적 중이므로 clean에 지워지지 않음 — dry-run에서 확인)
+Expected: `turbo run build` 4개 패키지 전부 성공. dry-run 목록에 `.superpowers/`와 `.env.development.local*`(git 추적됨)가 없어야 함.
 
 - [ ] **Step 3: Commit**
 
