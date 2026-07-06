@@ -43,6 +43,24 @@ k8s/argocd/
 - ✅ **lobby/matchmaking/room 3종 모노레포 이미지 재빌드·검증** — 첫 CI 실행(`all`)이 3종을 모노레포 코드로 재빌드해 ArgoCD 배포·기동 확인. 구 pre-monorepo 이미지 드리프트 트랩 해소.
 - ✅ **미사용 ts-node 제거** (lop-backend `packages/database`).
 
+## Phase 3 완료 (Unity 게임서버 CI)
+
+게임서버는 room-server가 매치마다 동적으로 pod로 띄우는 Unity 데디케이티드 서버다. 배포 흐름:
+
+1. **LeagueOfPhysical-Server** 레포 → GitHub Actions **gameserver-deploy** 버튼 (셀프호스트 러너 = 맥, Unity 라이선스)
+2. 셀프호스트 러너가 의존 UPM 레포(GameFramework/Shared/MasterData-Server)를 형제 위치에 클론 → Unity batchmode Linux 서버 빌드 → 도커 이미지 `re5nardo/game-server:<git-sha>`(amd64) 빌드·푸시
+3. infra의 **`game-server-config` ConfigMap**(`GAME_SERVER_IMAGE`)을 그 sha로 bump·commit·push
+4. ArgoCD가 ConfigMap 갱신 → **room-server**가 `GAME_SERVER_IMAGE` env로 매치 pod 이미지를 결정 (하드코딩 `:latest` 제거됨, fallback 유지). room-server는 재시작 시 새 값 반영.
+
+### 러너
+- 맥에 launchd 서비스로 상주(`~/actions-runner-lop`, `lop-mac-runner`). Unity 라이선스·docker는 맥 로컬 사용.
+- **주의(launchd keychain)**: launchd 서비스는 맥 keychain에 접근 못 해 docker/git ambient 인증이 실패한다. 그래서 워크플로는 시크릿(`DOCKERHUB_*`, `INFRA_REPO_TOKEN`) + `DOCKER_CONFIG`에 inline auth를 직접 작성해 keychain을 우회한다.
+
+### 후속 항목
+- **IL2CPP 미적용(현재 Mono)**: Linux IL2CPP 크로스컴파일 sysroot 툴체인이 맥에 없어(`Unable to find Linux Sysroot`) Mono 백엔드로 빌드 중. sysroot 설치(에디터에서 Linux IL2CPP 1회 빌드 시 UPM sysroot 패키지 자동 추가) 후 `BuildScript.cs`를 IL2CPP로 되돌리면 됨.
+- **게임서버 arch = amd64**: Unity 단일 아키 빌드. 로컬 arm64 클러스터에서 실제 pod 기동은 에뮬레이션/arm64 빌드 필요(이번 검증 범위 밖 — 배선까지 확인).
+- room.service.ts `getPublicIP` 하드코딩 `localhost` — 클라우드 노출 시 과제.
+
 ## 남은 hardening 이월 항목
 
 - **db-migrate 이미지 슬림화** — 현재 2.27GB(단일 스테이지 + tsc용 full devDep 설치). 앱 Dockerfile처럼 builder/runtime 멀티스테이지로 분리 가능.
