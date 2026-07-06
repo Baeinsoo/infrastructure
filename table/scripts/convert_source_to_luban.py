@@ -102,6 +102,17 @@ def write_beans_index():
                "range", "", "float", "", "", "", ""])
     ws.append(["", "", "", "", "", "", "", "", "",
                "angle", "", "float", "", "", "", ""])
+    # KnockbackEffect: 다중 필드(strength/range/angle/duration_ticks/decay_per_tick). DamageEffect와 동형.
+    ws.append(["", "KnockbackEffect", "AbilityEffect", "", "", "", "넉백 — 공격자 반대로 밀기(지수 감쇠)", "", "",
+               "strength", "", "float", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", "", "",
+               "range", "", "float", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", "", "",
+               "angle", "", "float", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", "", "",
+               "duration_ticks", "", "int", "", "", "", ""])
+    ws.append(["", "", "", "", "", "", "", "", "",
+               "decay_per_tick", "", "float", "", "", "", ""])
     ws.merge_cells("J1:P1")
     wb.save(os.path.join(OUT, "__beans__.xlsx"))
 
