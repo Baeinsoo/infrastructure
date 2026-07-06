@@ -4,4 +4,4 @@ metadata:
   name: game-server-config
   namespace: default
 data:
-  GAME_SERVER_IMAGE: re5nardo/game-server:0765a66
+  GAME_SERVER_IMAGE: re5nardo/game-server:07731b0
