@@ -1,7 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - job.yaml
+- job.yaml
 images:
-  - name: re5nardo/lop-db-migrate
-    newTag: latest
+- name: re5nardo/lop-db-migrate
+  newName: re5nardo/lop-db-migrate
+  newTag: e08245e
