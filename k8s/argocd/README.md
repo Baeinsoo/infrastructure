@@ -37,11 +37,15 @@ k8s/argocd/
 - **ArgoCD 자체 설치**: `k8s/argocd/install/`에 절차 문서화. app-of-apps가 관리하는 대상이 아니다 (ArgoCD가 자기 자신을 관리하지 않음).
 - **ingress-nginx 컨트롤러**: 클러스터 부트스트랩 단계에서 별도로 설치됨 (로컬 Docker Desktop 환경 기준). `k8s/platform/ingress`는 컨트롤러가 아니라 Ingress/서비스 라우팅 리소스만 관리한다.
 
-## Phase 2 이월 항목
+## Phase 2 완료 (백엔드 CI)
 
-- **이미지 태그가 가변 `:latest`** — 매니페스트가 `re5nardo/*:latest`를 참조하고 이미지가 수동으로 빌드·푸시됨. 재현성이 레지스트리 가변 상태에 의존한다. Phase 2에서 CI가 lop-backend HEAD로부터 immutable sha 태그를 빌드하고 `kustomize edit set image`로 매니페스트가 그 태그를 참조하도록 전환한다.
-- **lobby/matchmaking은 아직 구 pre-monorepo `:latest` 이미지**로 동작 중(우연히 호환). room-server(arm64)와 db-migrate만 모노레포 Dockerfile로 재빌드됨. Phase 2 CI가 `:latest`를 lop-backend HEAD로 처음 빌드하는 순간 lobby/matchmaking이 한 번도 배포·검증 안 된 모노레포 이미지로 교체되므로, 그 전에 3종을 모두 재빌드·검증할 것.
-- **db-migrate 이미지 슬림화** — 현재 2.27GB(단일 스테이지 + tsc용 full devDep 설치). 앱 Dockerfile처럼 builder/runtime 멀티스테이지로 분리 가능. 미사용 `ts-node` devDependency 제거 포함.
+- ✅ **이미지 sha 태깅** — backend-deploy 워크플로가 멀티아치 이미지를 `re5nardo/<app>:<git-sha>`로 빌드·푸시하고 `kustomize edit set image`로 매니페스트 태그를 bump. 더 이상 `:latest`에 의존하지 않음.
+- ✅ **lobby/matchmaking/room 3종 모노레포 이미지 재빌드·검증** — 첫 CI 실행(`all`)이 3종을 모노레포 코드로 재빌드해 ArgoCD 배포·기동 확인. 구 pre-monorepo 이미지 드리프트 트랩 해소.
+- ✅ **미사용 ts-node 제거** (lop-backend `packages/database`).
+
+## 남은 hardening 이월 항목
+
+- **db-migrate 이미지 슬림화** — 현재 2.27GB(단일 스테이지 + tsc용 full devDep 설치). 앱 Dockerfile처럼 builder/runtime 멀티스테이지로 분리 가능.
 - **앱 deployment에 resource requests/limits·health probe·replica>1 부재** (기존 매니페스트 그대로 이관됨) — 운영 대비 hardening 필요.
 
 > 참고: 초기 배포 시 seed 단계가 ts-node ESM directory-import 버그(`ERR_UNSUPPORTED_DIR_IMPORT`)로 실패했으나, seed를 CommonJS로 컴파일해 `node dist/seed.js`로 실행하도록 수정 완료(lop-backend `5b42d88`/`e421be9`). 현재 정상 동작한다.

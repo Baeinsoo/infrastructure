@@ -10,6 +10,17 @@
 - 클러스터에 직접 `kubectl apply/edit`로 넣은 변경은 selfHeal에 의해 되돌아갑니다 — Git이 항상 source of truth
 - 롤백 = 문제가 된 커밋을 `git revert` 후 push (또는 ArgoCD UI/CLI의 History에서 이전 revision으로 롤백)
 
+## 백엔드 코드 배포 (CI, Phase 2)
+
+백엔드 서버 코드는 이 레포가 아니라 **lop-backend 모노레포**에 있다. 코드 변경 배포는 매니페스트를 손대지 않고 버튼으로 한다:
+
+1. lop-backend에서 코드 수정·push
+2. GitHub Actions → **backend-deploy** 워크플로 → `Run workflow` 버튼 (대상: all / lobby-server / matchmaking-server / room-server / db-migrate 선택)
+3. 워크플로가 멀티아치(amd64+arm64) 이미지를 `re5nardo/<app>:<git-sha>`로 빌드·푸시하고, **이 레포의 `k8s/apps/backend/<app>/kustomization.yaml`의 이미지 태그를 그 sha로 bump·commit·push**
+4. ArgoCD가 태그 변경을 감지해 자동 롤아웃
+
+즉 이미지 태그는 더 이상 `:latest`가 아니라 **커밋 sha**다(재현성·롤백 가능). CI(빌드·태그) = GitHub Actions, CD(배포) = ArgoCD로 역할이 분리된다.
+
 ## 디렉토리 구조
 
 ```
