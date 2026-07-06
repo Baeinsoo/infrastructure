@@ -4,4 +4,4 @@ metadata:
   name: game-server-config
   namespace: default
 data:
-  GAME_SERVER_IMAGE: re5nardo/game-server:latest   # gameserver-deploy 워크플로 첫 실행 후 sha로 bump됨
+  GAME_SERVER_IMAGE: re5nardo/game-server:0765a66
