@@ -21,6 +21,28 @@
 
 즉 이미지 태그는 더 이상 `:latest`가 아니라 **커밋 sha**다(재현성·롤백 가능). CI(빌드·태그) = GitHub Actions, CD(배포) = ArgoCD로 역할이 분리된다.
 
+## 게임서버 배포 (CI, Phase 3)
+
+Unity 게임서버(LeagueOfPhysical-Server)는 **셀프호스트 러너(맥)**에서 Unity batchmode로 빌드한다:
+
+1. LeagueOfPhysical-Server에서 `gameserver-deploy` 워크플로 버튼 실행
+2. 러너가 형제 UPM 레포 클론 → Unity Linux 서버 빌드 → `re5nardo/game-server:<sha>`(amd64) 푸시
+3. 이 레포의 `k8s/apps/backend/game-server-config/configmap.yaml`의 `GAME_SERVER_IMAGE`를 그 sha로 bump·push
+4. ArgoCD sync → room-server가 매치 pod 생성 시 이 env(ConfigMap)를 읽어 새 이미지 사용
+
+## 클라이언트 앱/콘텐츠 배포 (CI, Phase 4)
+
+Unity 클라이언트(LeagueOfPhysical-Client)는 **서로 독립된 두 파이프라인**으로, k8s/ArgoCD를 거치지 않고 **S3로 직행**한다(클라이언트가 S3에서 직접 pull). Client 전용 셀프호스트 러너(`~/actions-runner-lop-client`, 라벨 `[self-hosted, client]`)에서 Unity batchmode로 빌드하며, 자격증명은 전용 IAM 사용자 `lop-ci-s3`의 정적 키(Client 레포 시크릿 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, `lop-assets`·`lop-client` 버킷만 RW)를 쓴다.
+
+- **③a 앱 배포** — `client-app-deploy` 버튼: 어드레서블 콘텐츠 full 빌드 → `s3://lop-assets/dev/Android/` (additive) + Android APK(디버그 서명) 빌드 → `s3://lop-client/builds/<sha>/{lop.apk,addressables_content_state.bin}` 보존 + `s3://lop-client/builds/latest.json`(sha 포인터) 갱신. 이 `content_state.bin`이 콘텐츠 파이프라인의 baseline 기준점.
+- **③b 콘텐츠 배포** — `content-deploy` 버튼: `latest.json`의 baseline `content_state.bin` 다운로드 → **"Update a Previous Build"**(증분) → `s3://lop-assets/dev/Android/`에 additive 업로드(설치된 앱과 카탈로그 호환). ③a가 최소 1회 실행돼 baseline이 있어야 성공.
+
+운영 모델: 앱은 가끔(코드 변경 시), 콘텐츠는 수시로 — 버튼이 따로 있고 서로를 기다리지 않는다. **콘텐츠 업로드는 `--delete` 금지(additive)** — 미변경 번들을 보존해 설치된 앱의 카탈로그가 깨지지 않게 한다.
+
+> **주의(러너 재현성):** `Assets/NuGetForUnity/Packages/`(R3, AutoMapper 등)는 gitignore라 fresh CI 체크아웃에서 컴파일하려면 git에 커밋돼 있어야 한다(Client 레포에 force-add 완료 — Phase 3 Server와 동일).
+>
+> **알려진 이월(도메인, 배포 무관):** Client main이 미생성 MasterData 타입 `LOP.MasterData.KnockbackEffect`(커밋 `a38e3a5`, 2026-07-06)를 참조해 클린 빌드가 컴파일 실패한다. infra `table`의 Luban bean 정의와 MasterData-Client 생성물에 KnockbackEffect가 없다(knockback MasterData promotion 미완결). 해소 후 ③a 버튼으로 끝-투-끝 검증할 것.
+
 ## 디렉토리 구조
 
 ```
