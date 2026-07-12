@@ -72,7 +72,7 @@ CS
 "$UNITY" -batchmode -quit -nographics -projectPath . -executeMethod _ArchProbe.Dump -logFile - 2>&1 | grep ARCH_API
 rm -f Assets/Editor/_ArchProbe.cs Assets/Editor/_ArchProbe.cs.meta
 ```
-Expected: `PlayerSettings.SetArchitecture(NamedBuildTarget,String)` 또는 유사 시그니처 출력. 이 시그니처를 Step 3 코드에 반영. (없으면 `EditorUserBuildSettings`/Linux 확장 경로로 확장 — Unity 6은 통상 `PlayerSettings.SetArchitecture(NamedBuildTarget, "x64"|"ARM64")`.)
+**확정됨 (2026-07-12 실측·디컴파일):** ⚠️ `PlayerSettings.SetArchitecture`는 **iOS/tvOS/visionOS 전용**이라 Linux에 안 먹고, `EditorUserBuildSettings.SetPlatformSettings("Standalone","StandaloneLinux64","Architecture",...)`도 **저장 안 됨**(둘 다 x86_64만 나옴). 빌드 확장(`ikdasm`)을 뜯어보니 실제 저장소는 **`UnityEditor.LinuxStandalone.UserBuildSettings.architecture`**(타입 `OSArchitecture`, Build Profile/classic 백킹). 확장 어셈블리 직접참조 불가라 **리플렉션**으로 설정. 상세는 memory `unity6-linux-arm64-build-api`. Step 3 코드는 이 방식(아래 `SetLinuxArchitecture`). **이미 구현·main 반영됨**(Server `847a18b`, amd64 ELF x86-64 / arm64 ELF ARM aarch64 실측 성공).
 
 - [ ] **Step 2: manifest의 sdk.linux 패키지 커밋 (피처 브랜치)**
 
@@ -90,6 +90,7 @@ git commit -m "build: Linux IL2CPP sysroot 패키지(sdk.linux-arm64/x86_64) 추
 `Assets/Scripts/Editor/BuildScript.cs` 전체 교체:
 ```csharp
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -97,6 +98,20 @@ using UnityEngine;
 
 public static class BuildScript
 {
+    // Linux 아키텍처 지정 — 실제 저장소는 UnityEditor.LinuxStandalone.UserBuildSettings.architecture.
+    // (PlayerSettings.SetArchitecture=iOS전용, SetPlatformSettings=미적용) 확장 어셈블리는 리플렉션으로.
+    static void SetLinuxArchitecture(string arch) // "x86_64" | "arm64"
+    {
+        var asm = System.AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => a.GetType("UnityEditor.LinuxStandalone.UserBuildSettings") != null);
+        if (asm == null) throw new System.Exception("LinuxStandalone extension assembly not found");
+        var ubs = asm.GetType("UnityEditor.LinuxStandalone.UserBuildSettings");
+        var helper = asm.GetType("UnityEditor.LinuxStandalone.LinuxArchitectureHelper");
+        var fromStr = helper.GetMethod("GetArchitectureFromString", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        var archProp = ubs.GetProperty("architecture", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        archProp.SetValue(null, fromStr.Invoke(null, new object[] { arch }));
+    }
+
     // CI: LOP_BUILD_ARCH=x86_64|arm64 Unity -batchmode -quit -nographics -projectPath . \
     //     -executeMethod BuildScript.BuildLinuxServer -logFile -
     // 아치별로 산출 디렉토리를 분리(GameServer/Build-<arch>)해 멀티아치 도커 빌드에 각각 쓴다.
@@ -125,8 +140,7 @@ public static class BuildScript
         // sysroot는 manifest의 com.unity.sdk.linux-* 패키지가 제공.
         EditorUserBuildSettings.standaloneBuildSubtarget = StandaloneBuildSubtarget.Server;
         PlayerSettings.SetScriptingBackend(NamedBuildTarget.Server, ScriptingImplementation.IL2CPP);
-        // 아키텍처 선택 (Step 1 introspection으로 확정한 시그니처). Unity 6: "x64" / "ARM64".
-        PlayerSettings.SetArchitecture(NamedBuildTarget.Server, arch == "arm64" ? "ARM64" : "x64");
+        SetLinuxArchitecture(arch); // 아래 헬퍼 — UserBuildSettings.architecture(리플렉션). Server 서브타겟 뒤에 호출.
 
         var options = new BuildPlayerOptions
         {
