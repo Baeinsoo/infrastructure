@@ -21,14 +21,21 @@
 
 즉 이미지 태그는 더 이상 `:latest`가 아니라 **커밋 sha**다(재현성·롤백 가능). CI(빌드·태그) = GitHub Actions, CD(배포) = ArgoCD로 역할이 분리된다.
 
-## 게임서버 배포 (CI, Phase 3)
+## 게임서버 배포 (CI, Phase 3 + 하드닝)
 
 Unity 게임서버(LeagueOfPhysical-Server)는 **셀프호스트 러너(맥)**에서 Unity batchmode로 빌드한다:
 
 1. LeagueOfPhysical-Server에서 `gameserver-deploy` 워크플로 버튼 실행
-2. 러너가 형제 UPM 레포 클론 → Unity Linux 서버 빌드 → `re5nardo/game-server:<sha>`(amd64) 푸시
+2. 러너가 형제 UPM 레포 클론 + NuGet 복원 → **Unity IL2CPP 빌드 ×2(amd64+arm64)** → 아치별 이미지 push → `docker buildx imagetools`로 `re5nardo/game-server:<sha>` **멀티아치 매니페스트** 생성
 3. 이 레포의 `k8s/apps/backend/game-server-config/configmap.yaml`의 `GAME_SERVER_IMAGE`를 그 sha로 bump·push
-4. ArgoCD sync → room-server가 매치 pod 생성 시 이 env(ConfigMap)를 읽어 새 이미지 사용
+4. ArgoCD sync → room-server가 매치 pod 생성 시 이 env(ConfigMap)를 읽어 새 이미지 사용. room.ip는 `GAME_SERVER_PUBLIC_IP`(같은 ConfigMap, 기본 localhost) 주입.
+
+**하드닝(2026-07-12):** Mono→**IL2CPP** 전환, **멀티아치**(로컬 arm64 클러스터 네이티브 pod 기동), getPublicIP 하드코딩→ConfigMap 주입. 설계·계획: `docs/specs/2026-07-12-gameserver-il2cpp-multiarch-publicip-design.md`, `docs/plans/2026-07-12-gameserver-il2cpp-multiarch-publicip.md`.
+
+- **Linux 아키텍처 지정**: `PlayerSettings.SetArchitecture`(iOS전용)·`SetPlatformSettings`로는 안 됨. `UnityEditor.LinuxStandalone.UserBuildSettings.architecture`(리플렉션)로 설정 — BuildScript.cs 참고. arm64 Linux 서버는 IL2CPP 전용(Unity에 arm64 Mono variation 없음). sysroot는 manifest의 `com.unity.sdk.linux-*` 패키지.
+- **base 이미지 = `ubuntu:22.04`**(glibc 2.35). Unity 6 IL2CPP 바이너리가 GLIBC_2.34+ 요구 — 20.04(2.31)로는 pod가 `GLIBC not found`로 죽음.
+- **⚠️ CI 미완(이월)**: CI(러너 fresh 체크아웃)의 Unity IL2CPP 빌드가 sysroot 해소 실패("No Linux sysroot found for x64" — manifest의 `sdk.linux@1.1.0`이 실제 sysroot를 안 끌어오고, 로컬은 전역 캐시 warm으로 우회). 현재 멀티아치 이미지는 **로컬 빌드→수동 push**로 배포·검증함. CI 자동화엔 올바른 toolchain 패키지(예: `com.unity.toolchain.macos-arm64-linux-x86_64@2.0.4`) 정합이 필요 — 후속.
+- **검증됨**: 멀티아치 매니페스트(amd64+arm64), arm64 pod가 로컬 arm64 노드에서 **네이티브 Running**(IL2CPP 실행). 매치 오케스트레이션 전체 E2E(room-server→pod→클라 접속)는 실제 match(matchmaking) 필요 — 별도.
 
 ## 클라이언트 앱/콘텐츠 배포 (CI, Phase 4)
 
