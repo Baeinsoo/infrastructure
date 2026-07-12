@@ -5,3 +5,4 @@ metadata:
   namespace: default
 data:
   GAME_SERVER_IMAGE: re5nardo/game-server:07731b0
+  GAME_SERVER_PUBLIC_IP: localhost   # 로컬 docker-desktop NodePort는 localhost 노출. 클라우드 이전 시 노드/LB IP로 교체
