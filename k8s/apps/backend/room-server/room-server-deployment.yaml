@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: room-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: room-server
+  template:
+    metadata:
+      labels:
+        app: room-server
+    spec:
+      serviceAccountName: room-server
+      containers:
+      - name: room-server
+        image: re5nardo/room-server:latest
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: room-server-config
+        - configMapRef:
+            name: game-server-config
+        - secretRef:
+            name: postgres-secret

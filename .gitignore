@@ -1,1 +1,5 @@
 table/_gen_scratch/
+
+# SDD 진행 레저/리뷰 산출물 (로컬 전용)
+.superpowers/
+.DS_Store

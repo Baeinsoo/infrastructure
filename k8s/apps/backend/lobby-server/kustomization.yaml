@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- lobby-server-configmap.yaml
+- lobby-server-deployment.yaml
+- lobby-server-service.yaml
+images:
+- name: re5nardo/lobby-server
+  newName: re5nardo/lobby-server
+  newTag: cbd1871
