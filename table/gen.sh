@@ -4,6 +4,7 @@ cd "$(dirname "$0")"
 LUBAN="tools/Luban/Luban.dll"
 CLIENT_PKG="../../LeagueOfPhysical-MasterData-Client/Runtime.Generated"
 SERVER_PKG="../../LeagueOfPhysical-MasterData-Server/Runtime.Generated"
+MM_PKG="../../LeagueOfPhysical-MatchmakingServer/MatchmakingServer"
 
 echo "[gen] target=client -> MasterData-Client package"
 rm -rf "$CLIENT_PKG/Scripts/MasterData" "$CLIENT_PKG/StreamingAssets/MasterData"
@@ -16,5 +17,11 @@ rm -rf "$SERVER_PKG/Scripts/MasterData" "$SERVER_PKG/StreamingAssets/MasterData"
 dotnet "$LUBAN" -t server -c cs-bin -d bin --conf luban.conf \
   -x outputCodeDir="$SERVER_PKG/Scripts/MasterData" \
   -x outputDataDir="$SERVER_PKG/StreamingAssets/MasterData"
+
+echo "[gen] target=matchmaking -> MatchmakingServer"
+rm -rf "$MM_PKG/src/loaders/generated" "$MM_PKG/master_data"
+dotnet "$LUBAN" -t matchmaking -c typescript-json -d json --conf luban.conf \
+  -x outputCodeDir="$MM_PKG/src/loaders/generated" \
+  -x outputDataDir="$MM_PKG/master_data"
 
 echo "[done]"
