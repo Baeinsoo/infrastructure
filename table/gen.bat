@@ -4,7 +4,7 @@ cd /d %~dp0
 set LUBAN=tools\Luban\Luban.dll
 set CLIENT_PKG=..\..\LeagueOfPhysical-MasterData-Client\Runtime.Generated
 set SERVER_PKG=..\..\LeagueOfPhysical-MasterData-Server\Runtime.Generated
-set MM_PKG=..\..\LeagueOfPhysical-MatchmakingServer\MatchmakingServer
+set MM_PKG=..\..\lop-backend\apps\matchmaking-server
 
 echo [gen] target=client
 if exist "%CLIENT_PKG%\Scripts\MasterData" rmdir /s /q "%CLIENT_PKG%\Scripts\MasterData"
@@ -28,7 +28,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [gen] target=matchmaking -^> MatchmakingServer
+echo [gen] target=matchmaking -^> lop-backend/apps/matchmaking-server
 if exist "%MM_PKG%\src\loaders\generated" rmdir /s /q "%MM_PKG%\src\loaders\generated"
 if exist "%MM_PKG%\master_data" rmdir /s /q "%MM_PKG%\master_data"
 dotnet %LUBAN% -t matchmaking -c typescript-json -d json --conf luban.conf ^
