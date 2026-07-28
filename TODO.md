@@ -58,9 +58,14 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=controller
 - 의미있는 태그 (`v0.1.0`, git short SHA 등) + `imagePullPolicy: IfNotPresent`
 - CI/CD 도입 시 자동 태깅 워크플로우 같이 마련
 
+**matchmaking-server는 이미 해결됨** — matchmaking-server는 `LeagueOfPhysical-MatchmakingServer`
+레포(2025-08-31 archived)에서 `lop-backend` 모노레포로 옮겨오면서 배포 매니페스트도 이
+`infrastructure` 레포의 `k8s/apps/backend/matchmaking-server/`로 이전됐고, `backend-deploy.yml`의
+`bump-tags` job이 매 배포마다 `kustomize edit set image`로 git short SHA를 자동으로 박는다
+(`kustomization.yaml`의 `images.newTag` 확인). 아래 남은 두 파일만 여전히 `:latest`.
+
 **관련 파일:**
 - `LOP/LeagueOfPhysical-LobbyServer/LobbyServer/k8s/local-k8s/lobby-server-deployment.yaml`
-- `LOP/LeagueOfPhysical-MatchmakingServer/MatchmakingServer/k8s/local-k8s/matchmaking-server-deployment.yaml`
 - `LOP/LeagueOfPhysical-RoomServer/RoomServer/k8s/local-k8s/room-server-deployment.yaml`
 
 ---
