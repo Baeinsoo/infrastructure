@@ -6,7 +6,7 @@ set CLIENT_PKG=..\..\LeagueOfPhysical-MasterData-Client\Runtime.Generated
 set SERVER_PKG=..\..\LeagueOfPhysical-MasterData-Server\Runtime.Generated
 set MM_PKG=..\..\lop-backend\apps\matchmaking-server
 
-echo [gen] target=client
+echo [gen] target=client -^> MasterData-Client package
 if exist "%CLIENT_PKG%\Scripts\MasterData" rmdir /s /q "%CLIENT_PKG%\Scripts\MasterData"
 if exist "%CLIENT_PKG%\StreamingAssets\MasterData" rmdir /s /q "%CLIENT_PKG%\StreamingAssets\MasterData"
 dotnet %LUBAN% -t client -c cs-bin -d bin --conf luban.conf ^
