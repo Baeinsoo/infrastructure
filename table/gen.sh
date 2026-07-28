@@ -19,9 +19,9 @@ dotnet "$LUBAN" -t server -c cs-bin -d bin --conf luban.conf \
   -x outputDataDir="$SERVER_PKG/StreamingAssets/MasterData"
 
 echo "[gen] target=matchmaking -> lop-backend/apps/matchmaking-server"
-rm -rf "$MM_PKG/src/loaders/generated" "$MM_PKG/master_data"
+rm -rf "$MM_PKG/src/masterdata" "$MM_PKG/master_data"
 dotnet "$LUBAN" -t matchmaking -c typescript-json -d json --conf luban.conf \
-  -x outputCodeDir="$MM_PKG/src/loaders/generated" \
+  -x outputCodeDir="$MM_PKG/src/masterdata" \
   -x outputDataDir="$MM_PKG/master_data"
 
 echo "[done]"

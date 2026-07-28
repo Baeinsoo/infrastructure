@@ -29,10 +29,10 @@ if errorlevel 1 (
 )
 
 echo [gen] target=matchmaking -^> lop-backend/apps/matchmaking-server
-if exist "%MM_PKG%\src\loaders\generated" rmdir /s /q "%MM_PKG%\src\loaders\generated"
+if exist "%MM_PKG%\src\masterdata" rmdir /s /q "%MM_PKG%\src\masterdata"
 if exist "%MM_PKG%\master_data" rmdir /s /q "%MM_PKG%\master_data"
 dotnet %LUBAN% -t matchmaking -c typescript-json -d json --conf luban.conf ^
-  -x outputCodeDir=%MM_PKG%\src\loaders\generated ^
+  -x outputCodeDir=%MM_PKG%\src\masterdata ^
   -x outputDataDir=%MM_PKG%\master_data
 if errorlevel 1 (
   echo [error] target=matchmaking generation failed
