@@ -7,4 +7,4 @@ resources:
 images:
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: e08245e
+  newTag: e5bd5b6
