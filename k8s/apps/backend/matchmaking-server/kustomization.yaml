@@ -8,4 +8,4 @@ resources:
 images:
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: 85446ee
+  newTag: 4bf2f11
