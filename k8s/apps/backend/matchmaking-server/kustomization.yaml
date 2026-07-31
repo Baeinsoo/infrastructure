@@ -4,6 +4,7 @@ resources:
 - matchmaking-server-configmap.yaml
 - matchmaking-server-deployment.yaml
 - matchmaking-server-service.yaml
+- matchmaking-director-deployment.yaml
 images:
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
