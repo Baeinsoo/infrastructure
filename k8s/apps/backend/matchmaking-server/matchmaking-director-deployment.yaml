@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matchmaking-director
+spec:
+  replicas: 1
+  # 롤링 업데이트는 새 파드를 띄운 뒤 옛 파드를 내린다 = 두 Director가 잠시 함께 돈다.
+  # 매칭 루프가 겹쳐 돌면 같은 사람이 두 매치에 들어가므로, 먼저 내리고 띄운다.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: matchmaking-director
+  template:
+    metadata:
+      labels:
+        app: matchmaking-director
+    spec:
+      containers:
+      - name: matchmaking-director
+        image: re5nardo/matchmaking-server:latest
+        # 매칭 서버와 같은 이미지의 두 번째 진입점 — 둘이 항상 같은 커밋이라 스키마 불일치가 구조적으로 불가능하다.
+        command: ["node", "dist/director.js"]
+        envFrom:
+        - configMapRef:
+            name: matchmaking-server-config
+        - secretRef:
+            name: postgres-secret
