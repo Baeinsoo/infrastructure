@@ -7,4 +7,4 @@ resources:
 images:
 - name: re5nardo/lobby-server
   newName: re5nardo/lobby-server
-  newTag: 63d6ead
+  newTag: f97ba7e
