@@ -5,4 +5,4 @@ resources:
 images:
 - name: re5nardo/lop-db-migrate
   newName: re5nardo/lop-db-migrate
-  newTag: 4bf2f11
+  newTag: 06ff767
