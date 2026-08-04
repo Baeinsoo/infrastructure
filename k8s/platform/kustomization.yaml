@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: default
 resources:
   - postgres
-  - mongodb
   - redis
   - ingress
   - rbac
