@@ -8,4 +8,4 @@ resources:
 images:
 - name: re5nardo/room-server
   newName: re5nardo/room-server
-  newTag: 8eef2ad
+  newTag: 6f3ab76
