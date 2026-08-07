@@ -22,3 +22,5 @@ spec:
             name: matchmaking-server-config
         - secretRef:
             name: postgres-secret
+        - secretRef:
+            name: auth-secret

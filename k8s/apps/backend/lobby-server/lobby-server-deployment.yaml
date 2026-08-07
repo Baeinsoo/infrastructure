@@ -22,3 +22,5 @@ spec:
             name: lobby-server-config
         - secretRef:
             name: postgres-secret
+        - secretRef:
+            name: auth-secret
