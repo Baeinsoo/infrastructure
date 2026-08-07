@@ -95,6 +95,16 @@ k8s/
    ```bash
    kubectl apply -f k8s/argocd/root-app.yaml
    ```
+4. `auth-secret` 수기 생성 (lobby-server/matchmaking-server가 부팅 시 요구 — 없으면 매칭은 크래시루프)
+   ```bash
+   kubectl create secret generic auth-secret \
+     --from-literal=AUTH_JWT_SECRET='local-dev-only-CHANGE-ME-not-a-real-secret'
+   ```
+   이 Secret은 **git에 매니페스트로 두지 않는다** — base64는 암호화가 아니라 인코딩이라, 평문 매니페스트를
+   커밋하면 레포 접근 권한이 있는 누구나 값을 읽을 수 있다(`postgres-secret.yaml`이 이미 그렇게 커밋돼
+   있는 건 기존 부채이지 따라야 할 패턴이 아니다). ArgoCD의 `prune: true`는 **자기가 만든 리소스만** 지우므로,
+   이렇게 out-of-band로 만든 Secret은 지워지지 않는다. 운영 환경으로 갈 때는 SealedSecrets / External
+   Secrets Operator / SOPS 중 하나를 도입해 이 수기 단계를 대체할 것.
 
 ## ArgoCD 접속
 
