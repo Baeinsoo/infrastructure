@@ -105,6 +105,14 @@ k8s/
    있는 건 기존 부채이지 따라야 할 패턴이 아니다). ArgoCD의 `prune: true`는 **자기가 만든 리소스만** 지우므로,
    이렇게 out-of-band로 만든 Secret은 지워지지 않는다. 운영 환경으로 갈 때는 SealedSecrets / External
    Secrets Operator / SOPS 중 하나를 도입해 이 수기 단계를 대체할 것.
+5. `internal-api-secret` 수기 생성 (lobby-server가 부팅 시 요구 / 게임서버 파드가 introspect 호출에 사용)
+   ```bash
+   kubectl create secret generic internal-api-secret \
+     --from-literal=INTERNAL_API_KEY='local-dev-only-CHANGE-ME-not-a-real-key'
+   ```
+   **`auth-secret`과 반드시 다른 Secret으로 둔다.** 게임서버 파드는 이 Secret의 키 하나만
+   `secretKeyRef`로 받는데, 서명키와 같은 Secret에 넣으면 `envFrom` 실수 한 번으로 토큰을 위조할 수 있는
+   키가 방마다 뜨는 파드에 퍼진다. 조회 키는 유출돼도 토큰 발급은 불가능하다.
 
 ## ArgoCD 접속
 
