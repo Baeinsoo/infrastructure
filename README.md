@@ -108,8 +108,10 @@ k8s/
 5. `internal-api-secret` 수기 생성 (lobby-server가 부팅 시 요구 / 게임서버 파드가 introspect 호출에 사용)
    ```bash
    kubectl create secret generic internal-api-secret \
-     --from-literal=INTERNAL_API_KEY='local-dev-only-CHANGE-ME-not-a-real-key'
+     --from-literal=INTERNAL_API_KEY="$(openssl rand -base64 32)"
    ```
+   값은 복붙용 리터럴이 아니라 매번 무작위로 생성한다 — introspect 엔드포인트는 ingress
+   `/lobby(/|$)(.*)` 규칙으로 클러스터 밖에서도 닿을 수 있어서, 이 키가 그 앞을 막는 유일한 문지기다.
    **`auth-secret`과 반드시 다른 Secret으로 둔다.** 게임서버 파드는 이 Secret의 키 하나만
    `secretKeyRef`로 받는데, 서명키와 같은 Secret에 넣으면 `envFrom` 실수 한 번으로 토큰을 위조할 수 있는
    키가 방마다 뜨는 파드에 퍼진다. 조회 키는 유출돼도 토큰 발급은 불가능하다.
