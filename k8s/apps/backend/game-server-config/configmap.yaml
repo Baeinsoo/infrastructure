@@ -4,7 +4,7 @@ metadata:
   name: game-server-config
   namespace: default
 data:
-  GAME_SERVER_IMAGE: re5nardo/game-server:0386402
+  GAME_SERVER_IMAGE: re5nardo/game-server:463d7fa
   # 클라에게 알려줄 게임서버 접속 주소. 클라우드 이전 시 노드/LB IP로 교체.
   #
   # "localhost"가 아니라 IPv4 리터럴이어야 한다. Windows에서 localhost는 ::1(IPv6)이 먼저
