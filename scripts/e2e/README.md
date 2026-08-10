@@ -64,7 +64,7 @@ kubectl delete svc -l app=room-service
 ## 사용법 (iwinv)
 
 ```bash
-scp trigger.js e2e.sh root@115.68.178.46:/root/
+scp -i ~/.ssh/iwinv_lop trigger.js e2e.sh root@115.68.178.46:/root/
 ssh -i ~/.ssh/iwinv_lop root@115.68.178.46 'bash /root/e2e.sh'
 ```
 

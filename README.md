@@ -34,7 +34,7 @@ Unity 게임서버(LeagueOfPhysical-Server)는 **셀프호스트 러너(맥)**�
 
 - **Linux 아키텍처 지정**: `PlayerSettings.SetArchitecture`(iOS전용)·`SetPlatformSettings`로는 안 됨. `UnityEditor.LinuxStandalone.UserBuildSettings.architecture`(리플렉션)로 설정 — BuildScript.cs 참고. arm64 Linux 서버는 IL2CPP 전용(Unity에 arm64 Mono variation 없음). sysroot는 manifest의 `com.unity.sdk.linux-*` 패키지.
 - **base 이미지 = `ubuntu:22.04`**(glibc 2.35). Unity 6 IL2CPP 바이너리가 GLIBC_2.34+ 요구 — 20.04(2.31)로는 pod가 `GLIBC not found`로 죽음.
-- **⚠️ CI 미완(이월)**: CI(러너 fresh 체크아웃)의 Unity IL2CPP 빌드가 sysroot 해소 실패("No Linux sysroot found for x64" — manifest의 `sdk.linux@1.1.0`이 실제 sysroot를 안 끌어오고, 로컬은 전역 캐시 warm으로 우회). 현재 멀티아치 이미지는 **로컬 빌드→수동 push**로 배포·검증함. CI 자동화엔 올바른 toolchain 패키지(예: `com.unity.toolchain.macos-arm64-linux-x86_64@2.0.4`) 정합이 필요 — 후속.
+- **✅ CI sysroot 해소됨**: 위에서 이월로 남겼던 "fresh 체크아웃의 Unity IL2CPP 빌드가 sysroot 해소 실패" 문제는 러너 워크스페이스에서 `Library/`를 보존(`actions/checkout`의 `clean: false`)하고 빌드 앞에 Unity 워밍업 세션을 한 번 끼워 넣어(LeagueOfPhysical-Server 커밋 `64da55b`/`9e0b73b`) 해소됐다. `gameserver-deploy` 워크플로가 러너에서 직접 IL2CPP 빌드·멀티아치 push·infra bump까지 전 과정을 자동 실행하며, 이 레포의 `22f93fb`(dev `GAME_SERVER_IMAGE` → `c483292`)가 그 결과로 CI가 만든 실제 커밋이다 — 로컬 빌드→수동 push 단계는 더 이상 없다.
 - **검증됨**: 멀티아치 매니페스트(amd64+arm64), arm64 pod가 로컬 arm64 노드에서 **네이티브 Running**(IL2CPP 실행). 매치 오케스트레이션 전체 E2E(room-server→pod→클라 접속)는 실제 match(matchmaking) 필요 — 별도.
 
 ## 클라이언트 앱/콘텐츠 배포 (CI, Phase 4)
@@ -101,6 +101,9 @@ k8s/
    kubectl apply -f k8s/local-k8s/ingress-nginx-deploy.yaml
    kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=ingress-nginx -n ingress-nginx --timeout=300s
    ```
+   이 매니페스트는 `local-k8s/`에 있지만 로컬 전용이 아니다 — `LoadBalancer` 서비스(`ingress-nginx-controller`)와
+   NodePort 서비스(`ingress-nginx-controller-nodeport`, 31000/32000)를 둘 다 정의하고 있어서 dev(k3s)의
+   ingress 부트스트랩도 이 파일 그대로 재현 가능하다(k3s 기본 ServiceLB가 `LoadBalancer`를 노드 공인 IP로 채워줌).
 2. ArgoCD 설치 (부트스트랩, 절차는 `k8s/argocd/install/README.md` 참고)
    ```bash
    kubectl create namespace argocd
@@ -166,7 +169,11 @@ http://localhost/room/
 
 ## 애플리케이션 이미지
 
-현재 백엔드 서버들은 `re5nardo/*:latest` 이미지를 사용합니다 (Phase 1 범위). CI에서 커밋 SHA 태그를 빌드·푸시하고 `kustomize edit set image`로 자동 반영하는 것은 Phase 2 작업입니다.
+백엔드 서버들은 `:latest`가 아니라 **커밋 sha 태그**를 씁니다. 실제 태그값은 이 레포의
+`k8s/envs/<env>/backend/kustomization.yaml`(`images:` 목록)에 환경별로 고정되어 있고,
+`backend-deploy`/`gameserver-deploy` CI 워크플로가 새 이미지를 빌드·푸시할 때마다 그 파일을
+직접 bump·commit·push합니다(위 "백엔드 코드 배포"/"게임서버 배포" 절 참고). 지금 어떤 태그가
+떠 있는지 알고 싶으면 클러스터가 아니라 그 kustomization.yaml 파일을 보면 된다.
 
 ## 트러블슈팅
 

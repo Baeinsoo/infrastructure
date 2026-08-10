@@ -7,8 +7,15 @@ public 레포(`https://github.com/Baeinsoo/infrastructure`)의 **자기 환경 �
 `k8s/argocd/`는 환경별로 완전히 분리된 두 트리(`envs/local`, `envs/dev`)를 갖는다.
 
 `root`/`platform`/`backend`라는 **Application 이름은 두 환경에서 동일**하게 유지한다. 서로 다른
-클러스터에 있으므로 이름이 겹쳐도 충돌하지 않는다 — 반대로 한쪽 환경에서 이름을 바꾸면 ArgoCD가 옛
-Application을 삭제하면서 딸린 워크로드까지 캐스케이드 삭제하므로 절대 바꾸지 않는다.
+클러스터에 있으므로 이름이 겹쳐도 충돌하지 않는다. **이름은 여전히 절대 바꾸지 않는다** — 단 그 이유는
+"바꾸면 캐스케이드 삭제된다"가 아니라 그 반대에 가깝다: 캐스케이드 여부는 kubectl의 `--cascade` 플래그가
+아니라 Application에 `resources-finalizer.argocd.argoproj.io` finalizer가 붙어 있는지로 결정되고, 지금
+세 Application 모두 그 finalizer가 없다(`k8s/argocd/install/README.md`의 "GitOps 자체를 되돌리기" 절
+참고). 이 상태에서 이름을 바꾸면(=구 이름 Application이 삭제 대상이 됨) 워크로드는 삭제되지 않고 ArgoCD
+추적에서만 떨어져 **고아 상태**가 되며, 새 이름의 Application이 같은 리소스를 다시 sync하려 할 때
+소유권 충돌을 겪을 수 있다. 반대로 ArgoCD UI/CLI(`argocd app delete`)로 지우면 삭제 시점에 finalizer를
+붙였다 지우는 경로라 그때는 실제로 캐스케이드 삭제된다. 두 경로 모두 원치 않는 결과이므로 이름은
+바꾸지 않는다.
 
 ## 구조
 
@@ -48,13 +55,18 @@ k8s/argocd/
 
 ## sync-wave 순서
 
-1. **wave 0 — platform**: postgres/mongodb/redis/ingress-nginx-경유 리소스/RBAC가 먼저 배포된다.
+1. **wave 0 — platform**: postgres/redis/ingress-nginx-경유 리소스/RBAC가 먼저 배포된다(mongodb는
+   이 프로젝트가 GitOps로 넘어오기 전에 매니페스트에서 제거됐다 — 지금 `k8s/base/platform`에 없다).
 2. **wave 1 — backend**: platform이 Synced 된 뒤 적용. `db-migrate` Job은 `PreSync` hook으로 등록되어 있어 lobby/matchmaking/room 서버 Deployment보다 먼저 실행되고, 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기한다 (sync-wave와 이중 안전장치).
 
 ## 접속법
 
 - ArgoCD UI/CLI: `kubectl port-forward svc/argocd-server -n argocd 8080:443` 후 `https://localhost:8080` (초기 admin 비밀번호는 `k8s/argocd/install/README.md` 참고).
-- 배포된 서비스: ingress-nginx NodePort 31000 경유, 예) `http://localhost:31000/lobby/`.
+- 배포된 서비스: 환경마다 접속 형태가 다르다 — local은 kind의 `extraPortMappings`로 31000/32000이 내
+  PC의 80/443으로 옮겨져 `http://localhost/lobby/`(포트 없이), dev(iwinv)는 NodePort를 그대로
+  `http://115.68.178.46:31000/lobby/`. `http://localhost:31000/...`은 Docker Desktop 시절 잔재로 kind
+  전환 이후 어느 환경에서도 접속되지 않는다(상세는 최상위 `README.md`의 "외부 접근" 절, dev 형태의
+  근거는 `k8s/argocd/install/README.md`의 "Access" 절 참고).
 - Application 상태 확인: `kubectl get applications -n argocd`.
 
 ## 배포 = 커밋 + push → 자동 sync
@@ -81,7 +93,7 @@ k8s/argocd/
 게임서버는 room-server가 매치마다 동적으로 pod로 띄우는 Unity 데디케이티드 서버다. 배포 흐름:
 
 1. **LeagueOfPhysical-Server** 레포 → GitHub Actions **gameserver-deploy** 버튼 (셀프호스트 러너 = 맥, Unity 라이선스)
-2. 셀프호스트 러너가 의존 UPM 레포(GameFramework/Shared/MasterData-Server)를 형제 위치에 클론 → Unity batchmode Linux 서버 빌드 → 도커 이미지 `re5nardo/game-server:<git-sha>`(amd64) 빌드·푸시
+2. 셀프호스트 러너가 의존 UPM 레포(GameFramework/Shared/MasterData-Server)를 형제 위치에 클론 → Unity batchmode Linux 서버 빌드(IL2CPP, amd64+arm64 각각) → `docker buildx imagetools`로 `re5nardo/game-server:<git-sha>` **멀티아치** 이미지 빌드·푸시
 3. infra의 **`k8s/envs/<env>/backend/game-server-config.env`**(`GAME_SERVER_IMAGE`)을 그 sha로 bump·commit·push
 4. 그 환경의 ArgoCD가 sync → `configMapGenerator`가 새 해시의 `game-server-config-<해시>` ConfigMap을 만들고 room-server Deployment가 자동 롤링 재시작(수기 `rollout restart` 불필요) → **room-server**가 `GAME_SERVER_IMAGE` env로 매치 pod 이미지를 결정 (하드코딩 `:latest` 제거됨, fallback 유지).
 
@@ -89,10 +101,14 @@ k8s/argocd/
 - 맥에 launchd 서비스로 상주(`~/actions-runner-lop`, `lop-mac-runner`). Unity 라이선스·docker는 맥 로컬 사용.
 - **주의(launchd keychain)**: launchd 서비스는 맥 keychain에 접근 못 해 docker/git ambient 인증이 실패한다. 그래서 워크플로는 시크릿(`DOCKERHUB_*`, `INFRA_REPO_TOKEN`) + `DOCKER_CONFIG`에 inline auth를 직접 작성해 keychain을 우회한다.
 
-### 후속 항목
-- **IL2CPP 미적용(현재 Mono)**: Linux IL2CPP 크로스컴파일 sysroot 툴체인이 맥에 없어(`Unable to find Linux Sysroot`) Mono 백엔드로 빌드 중. sysroot 설치(에디터에서 Linux IL2CPP 1회 빌드 시 UPM sysroot 패키지 자동 추가) 후 `BuildScript.cs`를 IL2CPP로 되돌리면 됨.
-- **게임서버 arch = amd64**: Unity 단일 아키 빌드. 로컬 arm64 클러스터에서 실제 pod 기동은 에뮬레이션/arm64 빌드 필요(이번 검증 범위 밖 — 배선까지 확인).
-- room.service.ts `getPublicIP` 하드코딩 `localhost` — 클라우드 노출 시 과제.
+### 후속 항목 (하드닝으로 해소됨 — 2026-07-12)
+
+위 세 항목은 이 절이 처음 쓰였을 때(Phase 3, Mono/amd64 단일 아치 시절)의 이월 목록이었으나,
+2026-07-12 하드닝 슬라이스로 모두 해소됐다(최상위 `README.md`의 "게임서버 배포" 절 참고):
+
+- ~~IL2CPP 미적용(Mono)~~ → **IL2CPP 적용됨**(`BuildScript.cs`가 `ScriptingImplementation.IL2CPP` 설정, arm64 Linux는 애초에 IL2CPP 전용이라 Mono 선택지가 없음).
+- ~~게임서버 arch = amd64 단일~~ → **멀티아치(amd64+arm64)**. 로컬 arm64 클러스터에서 네이티브 pod 기동까지 검증됨.
+- ~~room.service.ts `getPublicIP` 하드코딩 `localhost`~~ → **`GAME_SERVER_PUBLIC_IP` env로 주입**(fallback만 `localhost`). 값은 환경별 `k8s/envs/<env>/backend/game-server-config.env`에 고정(local `127.0.0.1`, dev iwinv 공인 IP).
 
 ## 남은 hardening 이월 항목
 
