@@ -25,3 +25,5 @@ spec:
             name: game-server-config
         - secretRef:
             name: postgres-secret
+        - secretRef:
+            name: internal-api-secret

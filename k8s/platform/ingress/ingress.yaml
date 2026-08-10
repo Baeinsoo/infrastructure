@@ -5,26 +5,29 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    # 내부 호출은 클러스터 DNS(http://lobby-server-service)로 직접 가고 인그레스를 안 거친다.
+    # 그래서 /internal을 여기서 막아도 깨질 호출이 없고, 내부 키가 새도 인터넷에서는 쓸 수 없다.
+    # 전방탐색 (?!...)은 캡처하지 않으므로 rewrite-target의 $2는 여전히 마지막 (.*)이다.
 spec:
   ingressClassName: nginx
   rules:
   - http:
       paths:
-      - path: /lobby(/|$)(.*)
+      - path: /lobby(/|$)(?!internal(?:/|$))(.*)
         pathType: ImplementationSpecific
         backend:
           service:
             name: lobby-server-service
             port: 
               number: 80
-      - path: /matchmaking(/|$)(.*)
+      - path: /matchmaking(/|$)(?!internal(?:/|$))(.*)
         pathType: ImplementationSpecific
         backend:
           service:
             name: matchmaking-server-service
             port: 
               number: 80
-      - path: /room(/|$)(.*)
+      - path: /room(/|$)(?!internal(?:/|$))(.*)
         pathType: ImplementationSpecific
         backend:
           service:
