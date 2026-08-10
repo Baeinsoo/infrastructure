@@ -26,4 +26,6 @@ spec:
         - secretRef:
             name: postgres-secret
         - secretRef:
+            name: auth-secret
+        - secretRef:
             name: internal-api-secret
