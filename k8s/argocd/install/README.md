@@ -40,6 +40,36 @@ All 7 pods should reach `Running`:
 
 > **메모리가 빠듯한 클러스터(예: iwinv 단일 노드)**에서는 로그인에 쓰지 않는 두 컴포넌트를 0으로
 > 스케일해 여유를 확보할 수 있다: `argocd-dex-server`, `argocd-notifications-controller`.
+> iwinv 설치 시점(2026-08-10) 실측: `free -m` 기준 총 7941MB 중 available 6497MB — ArgoCD(약 1GB)
+> 대비 여유가 충분해 **스케일 다운하지 않았다**. 7개 파드 모두 기본 replica로 Running 확인.
+
+## Secrets 부트스트랩 (Sync 이전에 반드시)
+
+`k8s/base/backend/*`의 일부 Deployment(`lobby-server`, `matchmaking-server`, `room-server` 등)는
+아래 두 Secret을 **ArgoCD가 관리하지 않는 사전 존재 리소스**로 참조한다. root-app을 등록(Task 7)하기
+전에 대상 클러스터에 반드시 먼저 만들어 둔다 — 없으면 Pod가 `CreateContainerConfigError`로 뜬다.
+
+| Secret | Key | 용도 |
+|---|---|---|
+| `auth-secret` | `AUTH_JWT_SECRET` | JWT 서명키 |
+| `internal-api-secret` | `INTERNAL_API_KEY` | 내부 API 조회키 |
+
+**반드시 서로 다른 Secret으로 분리한다** — 서명키와 조회키를 합치면 조회키만 필요한 게임서버 파드에도
+토큰 위조가 가능한 서명키가 함께 실리게 된다.
+
+```bash
+kubectl get secret auth-secret >/dev/null 2>&1 || \
+  kubectl create secret generic auth-secret \
+    --from-literal=AUTH_JWT_SECRET="$(openssl rand -base64 32)"
+kubectl get secret internal-api-secret >/dev/null 2>&1 || \
+  kubectl create secret generic internal-api-secret \
+    --from-literal=INTERNAL_API_KEY="$(openssl rand -base64 32)"
+kubectl get secret
+```
+
+- 값은 대상 호스트에서 `openssl rand -base64 32`로 즉석 생성한다 — 어디에도 커밋하거나 echo하지 않는다.
+- **이미 존재하면 건드리지 않는다** — 로테이션하지 않는다. 기존 워크로드가 그 값을 쓰고 있을 수 있다.
+- 두 Secret 모두 `default` 네임스페이스 (백엔드 워크로드와 동일 네임스페이스).
 
 ## Access
 
@@ -60,6 +90,20 @@ All 7 pods should reach `Running`:
     'kubectl port-forward -n argocd svc/argocd-server 8080:443'
   ```
   이후 로컬 브라우저로 https://localhost:8080.
+
+  접속 정보:
+  - 대상 IP: `115.68.178.46`
+  - SSH 키: `~/.ssh/iwinv_lop` (`root` 계정)
+  - kubectl은 별도 로컬 컨텍스트 없이 SSH 세션 안에서 그대로 실행 (호스트의 k3s kubectl)
+
+  ArgoCD와 별개로, root-app 등록 후 **배포된 백엔드 앱**은 ingress-nginx의 NodePort 31000(HTTP)으로
+  검증한다(ArgoCD UI 포트포워드와는 다른 포트):
+  ```bash
+  curl -s -o /dev/null -w "%{http_code}\n" http://115.68.178.46:31000/lobby/
+  ```
+  iwinv의 ingress-nginx Service는 `LoadBalancer` 타입이며 k3s 기본 ServiceLB(klipper)가
+  `.status.loadBalancer.ingress`에 노드 공인IP(`115.68.178.46`)를 채워준다 — kind의 NodePort 기반
+  ingress-nginx(외부IP 미채움, Ingress 헬스체크가 영원히 `Progressing`)와 다른 상황이다.
 
 ## Admin login
 
@@ -91,5 +135,11 @@ kubectl apply -f https://raw.githubusercontent.com/Baeinsoo/infrastructure/main/
 - CRDs installed: `applications.argoproj.io`, `applicationsets.argoproj.io`,
   `appprojects.argoproj.io`.
 - **local**: 이미 이 절차로 설치되어 동작 중이다 (컨텍스트 `kind-lop`).
-- **dev(iwinv)**: 아직 설치 전이다. 위 절차는 그대로 적용되지만, 라이브 서버이므로 설치 전에 기존
-  워크로드 조사·시크릿 부트스트랩·이미지 프리풀 같은 사전 점검이 추가로 필요하다.
+- **dev(iwinv)**: 2026-08-10에 위 절차로 설치 완료, 7개 파드 모두 Running (스케일 다운 없음 — 위
+  메모리 실측 참고). `auth-secret`/`internal-api-secret`도 이 시점에 부트스트랩됨. 라이브 서버라
+  설치 전에 기존 워크로드 조사(`kubectl get deploy -A` 등)와 게임서버 이미지 프리풀
+  (`crictl pull re5nardo/game-server:<tag>`)을 사전 점검으로 수행했다 — 게임서버는 상시
+  Deployment가 아니라 필요 시 동적으로 뜨는 Pod라, 첫 pull이 heartbeat 임계(10초)를 넘기면 부팅
+  전에 회수되는 문제를 예방하기 위함. root-app 등록(아래 "root-app 등록" 절)은 별도 작업(Task 7)
+  으로 아직 하지 않았다 — ArgoCD가 설치돼 있어도 `Application`/`AppProject`가 없으면 아무것도
+  동기화하지 않는다.
