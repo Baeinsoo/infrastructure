@@ -157,18 +157,43 @@ ssh -i ~/.ssh/iwinv_lop root@115.68.178.46 '
 ```
 `sync.revision`이 revert 커밋(되돌린 뒤의 최신 커밋)과 일치하면 완료. 즉시 반영하고 싶으면 3분을
 기다리는 대신 ArgoCD UI(포트포워드, 위 "Access" 절)에서 `backend`/`platform` Application의
-**Refresh**를 누른다 — `kubectl delete application`은 캐스케이드 삭제라 **금지**.
+**Refresh**를 누른다 — Application을 지웠다 다시 만들 필요는 없다(그 편이 더 빠르고 목적에 맞다).
 
-### 2) GitOps 자체를 되돌리기 — Application만 제거, 워크로드는 유지
+### 2) GitOps 자체를 되돌리기 — Application 삭제, 워크로드는 유지
 
 root-app 등록 자체가 문제(예: 예상 밖의 대량 diff, 계속되는 오싱크)라 GitOps 관리를 통째로 멈추고
-싶을 때. `--cascade=orphan`이 핵심 — 이게 없으면 Application 삭제가 Deployment/Service/ConfigMap
-등 관리 대상 리소스까지 함께 지운다(캐스케이드 삭제), 있으면 **Application 리소스 3개만** 지우고
-Pod/Deployment 등 실제 워크로드는 그대로 살아 있는다(더 이상 ArgoCD가 관리하지 않을 뿐).
+싶을 때.
+
+**캐스케이드 삭제 여부는 kubectl의 `--cascade` 플래그가 아니라, Application 오브젝트에 붙은
+`resources-finalizer.argocd.argoproj.io` finalizer가 결정한다.** 그 플래그는 쿠버네티스 네이티브
+ownerReference 가비지 컬렉터용이고, ArgoCD는 자신이 관리하는 리소스를 지울 때 그 GC를 쓰지 않는다
+— finalizer가 있으면 ArgoCD 자신이 정리하고, 없으면 Application 오브젝트만 사라진다. 지우기 전에
+반드시 먼저 확인한다:
+
+```bash
+kubectl -n argocd get application <name> -o jsonpath='{.metadata.finalizers}'
+```
+
+현재(2026-08-10) 세 Application 모두 finalizer가 비어 있음을 확인했다:
+```
+$ kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}{" finalizers="}{.metadata.finalizers}{"\n"}{end}'
+backend finalizers=
+platform finalizers=
+root finalizers=
+```
+이 상태(finalizer 없음)에서는 플래그 없는 **plain** `kubectl delete application`조차 워크로드를
+그대로 둔다 — finalizer가 없으면 애초에 ArgoCD의 정리 로직이 걸리지 않는다.
+
+**주의 — ArgoCD UI/CLI로 지우면 이 전제가 깨질 수 있다.** ArgoCD UI의 cascade-delete 체크박스와
+`argocd app delete`는 삭제 시점에 이 finalizer를 Application에 붙였다가 지운다 — 그러면 kubectl
+플래그와 무관하게 ArgoCD 자신이 관리 리소스를 정리해 버린다. 워크로드를 보존하려면 (1) 삭제 직전
+위 명령으로 finalizer가 비어 있는지 다시 확인하고, (2) **kubectl로 직접** 지운다 (ArgoCD UI/CLI
+경유 금지):
 
 ```bash
 ssh -i ~/.ssh/iwinv_lop root@115.68.178.46 '
-  kubectl delete application root platform backend -n argocd --cascade=orphan
+  kubectl -n argocd get applications -o jsonpath="{range .items[*]}{.metadata.name}{\" finalizers=\"}{.metadata.finalizers}{\"\n\"}{end}"
+  kubectl delete application root platform backend -n argocd
   kubectl get pods
 '
 ```
@@ -182,7 +207,7 @@ apply -k`) 체제로 사실상 돌아가는 것과 같다. GitOps를 다시 켜�
 | | 되돌리는 대상 | ArgoCD 관리 상태 | 워크로드 영향 |
 |---|---|---|---|
 | 1) 매니페스트 revert | 특정 변경 하나 | 유지(계속 GitOps) | 다음 폴링에 이전 상태로 롤링 |
-| 2) `--cascade=orphan` | GitOps 연결 자체 | 해제(Application만 삭제) | 없음(그대로 유지, 이후 수동 관리) |
+| 2) Application 삭제 (finalizer 없음 확인 후) | GitOps 연결 자체 | 해제(Application만 삭제) | 없음(그대로 유지, 이후 수동 관리) — **finalizer가 비어 있을 때만** 성립 |
 
 ## Notes
 - CRDs installed: `applications.argoproj.io`, `applicationsets.argoproj.io`,
@@ -201,3 +226,17 @@ apply -k`) 체제로 사실상 돌아가는 것과 같다. GitOps를 다시 켜�
   체제는 종료됨. ConfigMap 변경(`game-server-config.env`)만으로 room-server 파드가 **자동
   재시작**됨을 확인(kustomize `configMapGenerator` 해시 서픽스 + ArgoCD 동기화) — 더 이상
   "gameserver-deploy 먼저, backend-deploy 나중에" 순서를 지킬 필요가 없다.
+
+### dev(iwinv)에 git 밖에 남아 있는 상태 (알려진 수동 산출물)
+
+이 레포로 재구성할 수 없는, 호스트에만 있는 상태 두 가지 — 처음 보는 사람이 서프라이즈로
+발견하지 않도록 여기 남긴다:
+
+- **E2E 시드 행**: dev Postgres `Match`/`MatchRound` 테이블에 `test-match-1` /
+  `test-match-1-round-0` 행이 상시로 심어져 있다(2026-08-10, Task 7). `scripts/e2e/` 스크립트를
+  돌리기 위한 사전 조건 — 재현 SQL과 이유는 `scripts/e2e/README.md` 참고.
+- **고아 ConfigMap**: 7월 수동 배포가 만든 이름 없는(해시 서픽스 없는) `game-server-config`
+  ConfigMap이 아직 남아 있다. Age 16d(2026-08-10 기준), `GAME_SERVER_IMAGE` 값이 오래된
+  sha(`959ffb4`)로 고정돼 있고, 지금 워크로드는 kustomize가 생성한 해시 서픽스 ConfigMap
+  (`game-server-config-<hash>`)만 참조하므로 **미참조 상태**다. Task 6이 잡은 잔재 목록에
+  없어 Task 7에서는 지우지 않고 남겨 뒀다 — 정리는 별도 작업으로.
