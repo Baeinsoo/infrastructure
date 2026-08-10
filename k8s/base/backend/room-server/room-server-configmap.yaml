@@ -7,8 +7,11 @@ data:
   SPECIFIC_ENV: "local-k8s"
   # 게임 룸이 노드에 열 hostPort 범위(Agones의 gameservers.minPort/maxPort에 대응).
   # 이 범위는 노드에서 실제로 열려 있어야 한다 — 로컬은 k8s/local-k8s/kind-cluster.yaml의
-  # extraPortMappings, dev는 방화벽. 세 곳 중 하나만 늘리면 범위 밖 포트를 배정받아
-  # "매칭은 되는데 접속만 안 되는" 증상이 된다.
-  # 로컬은 kind가 포트를 한 줄씩 나열해야 해서 10개, dev/prod는 방화벽 한 줄이라 넓게 잡는다.
+  # extraPortMappings, dev는 방화벽. 이 값을 늘렸는데 노드 쪽을 안 맞추면 범위 밖 포트를
+  # 배정받아 "매칭은 되는데 접속만 안 되는" 증상이 된다.
+  # 지금은 base라 local/dev가 이 10개(7000-7009)를 그대로 공유한다 — 로컬은 kind가
+  # extraPortMappings를 포트 한 줄씩 나열해야 해서 그 개수에 맞춘 값이고, dev(iwinv)는
+  # 방화벽이 범위 지정이라 원래는 더 넓게 잡을 수 있지만 아직 넓히지 않았다. dev만 넓히려면
+  # 이 키를 base에서 빼서 envs/local·envs/dev 각자의 configMapGenerator로 옮겨야 한다.
   ROOM_PORT_MIN: "7000"
   ROOM_PORT_MAX: "7009"

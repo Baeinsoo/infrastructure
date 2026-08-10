@@ -58,13 +58,13 @@ All 7 pods should reach `Running`:
 토큰 위조가 가능한 서명키가 함께 실리게 된다.
 
 ```bash
-kubectl get secret auth-secret >/dev/null 2>&1 || \
-  kubectl create secret generic auth-secret \
+kubectl get secret auth-secret -n default >/dev/null 2>&1 || \
+  kubectl create secret generic auth-secret -n default \
     --from-literal=AUTH_JWT_SECRET="$(openssl rand -base64 32)"
-kubectl get secret internal-api-secret >/dev/null 2>&1 || \
-  kubectl create secret generic internal-api-secret \
+kubectl get secret internal-api-secret -n default >/dev/null 2>&1 || \
+  kubectl create secret generic internal-api-secret -n default \
     --from-literal=INTERNAL_API_KEY="$(openssl rand -base64 32)"
-kubectl get secret
+kubectl get secret -n default
 ```
 
 - 값은 대상 호스트에서 `openssl rand -base64 32`로 즉석 생성한다 — 어디에도 커밋하거나 echo하지 않는다.
