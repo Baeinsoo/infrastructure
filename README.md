@@ -153,12 +153,15 @@ kubectl get applications -n argocd
 
 ## 외부 접근
 
-ingress-nginx는 NodePort(HTTP 31000 / HTTPS 32000)로 노출되어 있습니다.
+ingress-nginx는 NodePort(HTTP 31000 / HTTPS 32000)로 떠 있지만, kind 클러스터가
+`extraPortMappings`로 컨테이너의 31000/32000 포트를 내 PC의 80/443으로 그대로 옮겨주기
+때문에(`k8s/local-k8s/kind-cluster.yaml`) 실제로 여는 포트는 80/443입니다. `localhost:31000`은
+Docker Desktop 시절(NodePort를 직접 열어야 했던 때)의 잔재로, kind 전환 이후에는 접속이 안 됩니다.
 
 ```
-http://localhost:31000/lobby/
-http://localhost:31000/matchmaking/
-http://localhost:31000/room/
+http://localhost/lobby/
+http://localhost/matchmaking/
+http://localhost/room/
 ```
 
 ## 애플리케이션 이미지
