@@ -8,6 +8,9 @@ metadata:
     # 내부 호출은 클러스터 DNS(http://lobby-server-service)로 직접 가고 인그레스를 안 거친다.
     # 그래서 /internal을 여기서 막아도 깨질 호출이 없고, 내부 키가 새도 인터넷에서는 쓸 수 없다.
     # 전방탐색 (?!...)은 캡처하지 않으므로 rewrite-target의 $2는 여전히 마지막 (.*)이다.
+    # use-regex: "true" 조합에서 ingress-nginx는 location을 항상 대소문자 구분 없이(~*)
+    # 생성한다 — 이 대소문자 무시는 패턴 전체(전방탐색 안쪽 "internal" 포함)에 걸리므로
+    # /Internal, /INTERNAL 같은 변형도 이미 막힌다. 별도 (?i) 처리를 추가할 필요 없음.
 spec:
   ingressClassName: nginx
   rules:
