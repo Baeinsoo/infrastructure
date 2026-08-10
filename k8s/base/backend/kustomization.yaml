@@ -5,5 +5,4 @@ resources:
   - lobby-server
   - matchmaking-server
   - room-server
-  - game-server-config
   - db-migrate

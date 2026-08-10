@@ -5,7 +5,3 @@ resources:
 - room-server-deployment.yaml
 - room-server-service.yaml
 - serviceaccount.yaml
-images:
-- name: re5nardo/room-server
-  newName: re5nardo/room-server
-  newTag: 9937c81
