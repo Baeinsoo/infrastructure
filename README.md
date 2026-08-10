@@ -16,10 +16,10 @@
 
 1. lop-backend에서 코드 수정·push
 2. GitHub Actions → **backend-deploy** 워크플로 → `Run workflow` 버튼 (대상: all / lobby-server / matchmaking-server / room-server / db-migrate 선택)
-3. 워크플로가 멀티아치(amd64+arm64) 이미지를 `re5nardo/<app>:<git-sha>`로 빌드·푸시하고, **이 레포의 `k8s/apps/backend/<app>/kustomization.yaml`의 이미지 태그를 그 sha로 bump·commit·push**
-4. ArgoCD가 태그 변경을 감지해 자동 롤아웃
+3. 워크플로가 멀티아치(amd64+arm64) 이미지를 `re5nardo/<app>:<git-sha>`로 빌드·푸시하고, **이 레포의 `k8s/envs/<env>/backend/kustomization.yaml`의 이미지 태그를 그 sha로 bump·commit·push**
+4. 그 환경을 보고 있는 ArgoCD가 태그 변경을 감지해 자동 롤아웃
 
-즉 이미지 태그는 더 이상 `:latest`가 아니라 **커밋 sha**다(재현성·롤백 가능). CI(빌드·태그) = GitHub Actions, CD(배포) = ArgoCD로 역할이 분리된다.
+즉 이미지 태그는 더 이상 `:latest`가 아니라 **커밋 sha**다(재현성·롤백 가능). CI(빌드·태그) = GitHub Actions, CD(배포) = ArgoCD로 역할이 분리된다. 이미지 태그 경로가 환경별 폴더(`k8s/envs/local/backend`, `k8s/envs/dev/backend`)로 나뉘어 있으므로, 배포 워크플로에는 어느 환경(local/dev/both)에 반영할지 고르는 environment 선택 입력이 추가된다.
 
 ## 게임서버 배포 (CI, Phase 3 + 하드닝)
 
@@ -27,8 +27,8 @@ Unity 게임서버(LeagueOfPhysical-Server)는 **셀프호스트 러너(맥)**�
 
 1. LeagueOfPhysical-Server에서 `gameserver-deploy` 워크플로 버튼 실행
 2. 러너가 형제 UPM 레포 클론 + NuGet 복원 → **Unity IL2CPP 빌드 ×2(amd64+arm64)** → 아치별 이미지 push → `docker buildx imagetools`로 `re5nardo/game-server:<sha>` **멀티아치 매니페스트** 생성
-3. 이 레포의 `k8s/apps/backend/game-server-config/configmap.yaml`의 `GAME_SERVER_IMAGE`를 그 sha로 bump·push
-4. ArgoCD sync → room-server가 매치 pod 생성 시 이 env(ConfigMap)를 읽어 새 이미지 사용. room.ip는 `GAME_SERVER_PUBLIC_IP`(같은 ConfigMap, 기본 localhost) 주입.
+3. 이 레포의 `k8s/envs/<env>/backend/game-server-config.env`의 `GAME_SERVER_IMAGE`를 그 sha로 bump·push. 이 파일이 환경별 폴더 아래에 있으므로, 이 워크플로에도 어느 환경(local/dev/both)에 반영할지 고르는 environment 선택 입력이 추가된다.
+4. 그 환경의 ArgoCD sync → room-server가 이 env(`configMapGenerator`가 생성한 ConfigMap)를 읽어 새 이미지 사용. room.ip는 `GAME_SERVER_PUBLIC_IP`(같은 ConfigMap, 환경별 `.env`에 고정값 — local `127.0.0.1`, dev는 iwinv 공인 IP) 주입.
 
 **하드닝(2026-07-12):** Mono→**IL2CPP** 전환, **멀티아치**(로컬 arm64 클러스터 네이티브 pod 기동), getPublicIP 하드코딩→ConfigMap 주입. 설계·계획: `docs/specs/2026-07-12-gameserver-il2cpp-multiarch-publicip-design.md`, `docs/plans/2026-07-12-gameserver-il2cpp-multiarch-publicip.md`.
 
@@ -54,30 +54,45 @@ Unity 클라이언트(LeagueOfPhysical-Client)는 **서로 독립된 두 파이�
 
 ```
 k8s/
-├── platform/              # ArgoCD 관리 (sync-wave 0): DB/캐시/ingress/RBAC
-│   ├── postgres/
-│   ├── mongodb/
-│   ├── redis/
-│   ├── ingress/           # lop-ingress (라우팅 규칙)
-│   ├── rbac/
-│   └── kustomization.yaml
-├── apps/backend/           # ArgoCD 관리 (sync-wave 1): 백엔드 서버 3종 + DB 마이그레이션
-│   ├── lobby-server/
-│   ├── matchmaking-server/
-│   ├── room-server/
-│   ├── db-migrate/         # PreSync hook Job (prisma migrate deploy + seed)
-│   └── kustomization.yaml
-├── argocd/                  # app-of-apps 정의
-│   ├── root-app.yaml        # 루트 Application (argocd 네임스페이스가 관리)
-│   ├── apps/
-│   │   ├── platform.yaml    # sync-wave "0" → k8s/platform
-│   │   └── backend.yaml     # sync-wave "1" → k8s/apps/backend
+├── base/                    # 환경 비종속 매니페스트 (환경 오버레이가 참조하는 원본)
+│   ├── platform/             # 두 환경이 그대로 공유 (환경별 오버레이 없음)
+│   │   ├── postgres/
+│   │   ├── redis/
+│   │   ├── ingress/          # lop-ingress (라우팅 규칙)
+│   │   ├── rbac/
+│   │   └── kustomization.yaml
+│   └── backend/               # 백엔드 서버 3종 + DB 마이그레이션 (이미지 태그·env 값은 없음)
+│       ├── lobby-server/
+│       ├── matchmaking-server/
+│       ├── room-server/
+│       ├── db-migrate/        # PreSync hook Job (prisma migrate deploy + seed)
+│       └── kustomization.yaml
+├── envs/                     # 환경별 오버레이 — 이미지 태그·게임서버 접속 IP만 여기서 갈린다
+│   ├── local/backend/
+│   │   ├── kustomization.yaml   # ../../../base/backend 참조 + images: 태그 + configMapGenerator
+│   │   └── game-server-config.env   # GAME_SERVER_PUBLIC_IP=127.0.0.1
+│   └── dev/backend/
+│       ├── kustomization.yaml   # local과 내용 동일 (태그는 CI가 환경별로 따로 bump)
+│       └── game-server-config.env   # GAME_SERVER_PUBLIC_IP=<iwinv 공인 IP>
+├── argocd/                  # app-of-apps 정의 — 클러스터(환경)마다 별도 트리
+│   ├── envs/
+│   │   ├── local/
+│   │   │   ├── root-app.yaml     # 루트 Application (argocd 네임스페이스가 관리) → k8s/argocd/envs/local/apps
+│   │   │   └── apps/
+│   │   │       ├── platform.yaml # sync-wave "0" → k8s/base/platform
+│   │   │       └── backend.yaml  # sync-wave "1" → k8s/envs/local/backend
+│   │   └── dev/
+│   │       ├── root-app.yaml     # → k8s/argocd/envs/dev/apps
+│   │       └── apps/
+│   │           ├── platform.yaml # sync-wave "0" → k8s/base/platform (local과 동일 파일)
+│   │           └── backend.yaml  # sync-wave "1" → k8s/envs/dev/backend
 │   └── install/              # ArgoCD 자체 설치 절차 (부트스트랩, ArgoCD 밖에서 관리)
 └── local-k8s/
-    └── ingress-nginx-deploy.yaml  # NGINX Ingress Controller (부트스트랩, ArgoCD 미관리)
+    ├── kind-cluster.yaml           # 로컬 kind 클러스터 정의 (부트스트랩)
+    └── ingress-nginx-deploy.yaml   # NGINX Ingress Controller (부트스트랩, ArgoCD 미관리)
 ```
 
-`root` Application이 `k8s/argocd/apps`를 지켜보며 그 안의 `platform`/`backend` Application을 자동으로 생성·관리합니다 (app-of-apps 패턴). sync-wave로 platform(DB/redis/ingress) → backend(서버) 순서를 보장하고, `db-migrate`는 `PreSync` hook Job으로 등록되어 있어 서버 Deployment보다 먼저 실행됩니다. 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기하여 이중으로 순서를 보장합니다.
+클러스터마다 **자체 ArgoCD**가 떠 있고(허브-스포크 구조가 아님), 각 ArgoCD의 `root` Application이 자기 환경의 `k8s/argocd/envs/<env>/apps`를 지켜보며 그 안의 `platform`/`backend` Application을 자동으로 생성·관리합니다 (app-of-apps 패턴). `platform`은 두 환경이 `k8s/base/platform`을 그대로 공유하고, `backend`는 환경별 오버레이(`k8s/envs/<env>/backend`)를 봅니다. sync-wave로 platform(DB/redis/ingress) → backend(서버) 순서를 보장하고, `db-migrate`는 `PreSync` hook Job으로 등록되어 있어 서버 Deployment보다 먼저 실행됩니다. 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기하여 이중으로 순서를 보장합니다. Application 이름(`root`/`platform`/`backend`)은 두 환경에서 동일합니다 — 서로 다른 클러스터에 있으므로 충돌하지 않습니다. 두 환경의 경로 대응표는 `k8s/argocd/README.md` 참고.
 
 ## 최초 배포 (빈 클러스터)
 
@@ -91,10 +106,11 @@ k8s/
    kubectl create namespace argocd
    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.2/manifests/install.yaml
    ```
-3. app-of-apps 등록 (이후 모든 배포는 Git push로 자동화됨)
+3. app-of-apps 등록 (이후 모든 배포는 Git push로 자동화됨). 로컬 클러스터는 `envs/local`을 쓴다:
    ```bash
-   kubectl apply -f k8s/argocd/root-app.yaml
+   kubectl apply -f k8s/argocd/envs/local/root-app.yaml
    ```
+   (dev/iwinv 클러스터는 같은 방식으로 `k8s/argocd/envs/dev/root-app.yaml`을 그 클러스터에 apply한다 — 절차는 `k8s/argocd/install/README.md` 참고.)
 4. `auth-secret` 수기 생성 (lobby-server/matchmaking-server가 부팅 시 요구 — 없으면 매칭은 크래시루프)
    ```bash
    kubectl create secret generic auth-secret \
@@ -176,10 +192,10 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=ingress-nginx -
 kubectl get validatingwebhookconfigurations ingress-nginx-admission
 
 # 4. Ingress 적용 (ArgoCD 관리 하에서는 위 root-app 등록만으로 자동 적용됨)
-kubectl apply -k k8s/platform/ingress
+kubectl apply -k k8s/base/platform/ingress
 ```
 
-> 참고: ArgoCD가 `k8s/platform`을 관리하는 정상 운영 상태에서는 이 문제가 sync-wave 덕분에 거의 발생하지 않습니다 (ingress-nginx 컨트롤러는 클러스터 부트스트랩 단계에서 미리 준비되어 있어야 함). 위 절차는 ingress-nginx 컨트롤러를 새로 설치하거나 재현할 때 참고용입니다.
+> 참고: ArgoCD가 `k8s/base/platform`을 관리하는 정상 운영 상태에서는 이 문제가 sync-wave 덕분에 거의 발생하지 않습니다 (ingress-nginx 컨트롤러는 클러스터 부트스트랩 단계에서 미리 준비되어 있어야 함). 위 절차는 ingress-nginx 컨트롤러를 새로 설치하거나 재현할 때 참고용입니다.
 
 ## Kubernetes 서비스/Ingress 개념 요약
 
@@ -192,7 +208,7 @@ kubectl apply -k k8s/platform/ingress
     - Ingress 리소스(YAML)는 단순 명세
     - Ingress Controller(Pod)가 이를 읽어 실제 라우팅(NGINX 설정 등) 구성
     - Ingress Controller 자체는 보통 Service(LoadBalancer / NodePort)로 외부 트래픽을 받음
-    - 참고 파일: `k8s/platform/ingress/ingress.yaml`, `k8s/local-k8s/ingress-nginx-deploy.yaml`
+    - 참고 파일: `k8s/base/platform/ingress/ingress.yaml`, `k8s/local-k8s/ingress-nginx-deploy.yaml`
 
 - 외부 노출 방식
     - Ingress Controller의 Service 타입이 아래 중 하나

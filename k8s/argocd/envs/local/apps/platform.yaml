@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/Baeinsoo/infrastructure
     targetRevision: main
-    path: k8s/platform
+    path: k8s/base/platform
   destination:
     server: https://kubernetes.default.svc
     namespace: default

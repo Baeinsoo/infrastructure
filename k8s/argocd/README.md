@@ -1,17 +1,50 @@
 # ArgoCD app-of-apps
 
+## 환경마다 별도 ArgoCD
+
+이 레포는 **클러스터마다 자체 ArgoCD**를 둔다(허브-스포크 구조가 아니다) — 각 클러스터의 ArgoCD가 같은
+public 레포(`https://github.com/Baeinsoo/infrastructure`)의 **자기 환경 경로만** 본다. 그래서
+`k8s/argocd/`는 환경별로 완전히 분리된 두 트리(`envs/local`, `envs/dev`)를 갖는다.
+
+`root`/`platform`/`backend`라는 **Application 이름은 두 환경에서 동일**하게 유지한다. 서로 다른
+클러스터에 있으므로 이름이 겹쳐도 충돌하지 않는다 — 반대로 한쪽 환경에서 이름을 바꾸면 ArgoCD가 옛
+Application을 삭제하면서 딸린 워크로드까지 캐스케이드 삭제하므로 절대 바꾸지 않는다.
+
 ## 구조
 
 ```
 k8s/argocd/
-├── root-app.yaml        # app-of-apps 루트 (argocd 네임스페이스가 관리)
-├── apps/
-│   ├── platform.yaml     # sync-wave "0" — DB/redis/ingress/RBAC (k8s/platform)
-│   └── backend.yaml      # sync-wave "1" — lobby/matchmaking/room + db-migrate (k8s/apps/backend)
+├── envs/
+│   ├── local/
+│   │   ├── root-app.yaml   # app-of-apps 루트 (argocd 네임스페이스가 관리) → k8s/argocd/envs/local/apps
+│   │   └── apps/
+│   │       ├── platform.yaml # sync-wave "0" — DB/redis/ingress/RBAC (k8s/base/platform)
+│   │       └── backend.yaml  # sync-wave "1" — lobby/matchmaking/room + db-migrate (k8s/envs/local/backend)
+│   └── dev/
+│       ├── root-app.yaml   # → k8s/argocd/envs/dev/apps
+│       └── apps/
+│           ├── platform.yaml # sync-wave "0" — k8s/base/platform (local과 완전히 동일한 파일)
+│           └── backend.yaml  # sync-wave "1" — k8s/envs/dev/backend
 └── install/              # ArgoCD 자체 설치 절차 (부트스트랩, ArgoCD 밖에서 관리)
 ```
 
-`root` Application이 `k8s/argocd/apps` 디렉토리를 지켜보며 그 안의 `platform`/`backend` Application을 자동으로 생성·관리한다 (app-of-apps 패턴). 세 Application 모두 `syncPolicy.automated: {prune: true, selfHeal: true}` — 레포에 반영된 상태가 곧 클러스터 상태가 된다.
+각 환경의 `root` Application이 자기 `k8s/argocd/envs/<env>/apps` 디렉토리를 지켜보며 그 안의
+`platform`/`backend` Application을 자동으로 생성·관리한다 (app-of-apps 패턴). 모든 Application이
+`syncPolicy.automated: {prune: true, selfHeal: true}` — 레포에 반영된 상태가 곧 (그 환경의) 클러스터
+상태가 된다.
+
+## 두 환경의 path 대응표
+
+| Application | local | dev |
+|---|---|---|
+| `root`(source path) | `k8s/argocd/envs/local/apps` | `k8s/argocd/envs/dev/apps` |
+| `platform`(source path) | `k8s/base/platform` | `k8s/base/platform` (동일) |
+| `backend`(source path) | `k8s/envs/local/backend` | `k8s/envs/dev/backend` |
+| destination cluster | `https://kubernetes.default.svc` (kind, 컨텍스트 `kind-lop`) | `https://kubernetes.default.svc` (iwinv k3s, `115.68.178.46`) |
+
+`destination.server`가 두 환경 모두 `https://kubernetes.default.svc`인 이유는 **각 클러스터 안에서
+동작하는 자기 자신의 ArgoCD**를 가리키기 때문이다 — 원격 클러스터를 가리키는 게 아니라 "이 ArgoCD가 떠
+있는 바로 이 클러스터"라는 뜻이다.
 
 ## sync-wave 순서
 
@@ -26,7 +59,7 @@ k8s/argocd/
 
 ## 배포 = 커밋 + push → 자동 sync
 
-이 레포(`k8s/platform`, `k8s/apps/backend`, `k8s/argocd/apps`)에 변경을 커밋하고 `main`에 push하면, ArgoCD가 자동으로 감지해 `automated` 정책에 따라 sync한다. 수동으로 `kubectl apply`할 필요가 없다 — 클러스터에 직접 넣은 변경은 selfHeal에 의해 되돌아간다(GitOps 원칙: Git이 source of truth).
+이 레포(`k8s/base/platform`, `k8s/envs/<env>/backend`, `k8s/argocd/envs/<env>/apps`)에 변경을 커밋하고 `main`에 push하면, 그 환경을 보는 ArgoCD가 자동으로 감지해 `automated` 정책에 따라 sync한다. 수동으로 `kubectl apply`할 필요가 없다 — 클러스터에 직접 넣은 변경은 selfHeal에 의해 되돌아간다(GitOps 원칙: Git이 source of truth). `platform`은 환경 구분 없이 한 경로(`k8s/base/platform`)를 커밋하면 **두 환경 모두**에 반영된다.
 
 ## 롤백 = 커밋 revert
 
@@ -35,7 +68,7 @@ k8s/argocd/
 ## 부트스트랩 (ArgoCD 밖에서 관리되는 것)
 
 - **ArgoCD 자체 설치**: `k8s/argocd/install/`에 절차 문서화. app-of-apps가 관리하는 대상이 아니다 (ArgoCD가 자기 자신을 관리하지 않음).
-- **ingress-nginx 컨트롤러**: 클러스터 부트스트랩 단계에서 별도로 설치됨 (로컬 Docker Desktop 환경 기준). `k8s/platform/ingress`는 컨트롤러가 아니라 Ingress/서비스 라우팅 리소스만 관리한다.
+- **ingress-nginx 컨트롤러**: 클러스터 부트스트랩 단계에서 별도로 설치됨 (local은 kind, `k8s/local-k8s/ingress-nginx-deploy.yaml`). `k8s/base/platform/ingress`는 컨트롤러가 아니라 Ingress/서비스 라우팅 리소스만 관리한다.
 
 ## Phase 2 완료 (백엔드 CI)
 
@@ -49,8 +82,8 @@ k8s/argocd/
 
 1. **LeagueOfPhysical-Server** 레포 → GitHub Actions **gameserver-deploy** 버튼 (셀프호스트 러너 = 맥, Unity 라이선스)
 2. 셀프호스트 러너가 의존 UPM 레포(GameFramework/Shared/MasterData-Server)를 형제 위치에 클론 → Unity batchmode Linux 서버 빌드 → 도커 이미지 `re5nardo/game-server:<git-sha>`(amd64) 빌드·푸시
-3. infra의 **`game-server-config` ConfigMap**(`GAME_SERVER_IMAGE`)을 그 sha로 bump·commit·push
-4. ArgoCD가 ConfigMap 갱신 → **room-server**가 `GAME_SERVER_IMAGE` env로 매치 pod 이미지를 결정 (하드코딩 `:latest` 제거됨, fallback 유지). room-server는 재시작 시 새 값 반영.
+3. infra의 **`k8s/envs/<env>/backend/game-server-config.env`**(`GAME_SERVER_IMAGE`)을 그 sha로 bump·commit·push
+4. 그 환경의 ArgoCD가 sync → `configMapGenerator`가 새 해시의 `game-server-config-<해시>` ConfigMap을 만들고 room-server Deployment가 자동 롤링 재시작(수기 `rollout restart` 불필요) → **room-server**가 `GAME_SERVER_IMAGE` env로 매치 pod 이미지를 결정 (하드코딩 `:latest` 제거됨, fallback 유지).
 
 ### 러너
 - 맥에 launchd 서비스로 상주(`~/actions-runner-lop`, `lop-mac-runner`). Unity 라이선스·docker는 맥 로컬 사용.
