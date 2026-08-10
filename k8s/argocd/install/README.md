@@ -131,6 +131,59 @@ kubectl apply -f k8s/argocd/envs/local/root-app.yaml
 kubectl apply -f https://raw.githubusercontent.com/Baeinsoo/infrastructure/main/k8s/argocd/envs/dev/root-app.yaml
 ```
 
+## 롤백 절차 (dev/iwinv)
+
+두 갈래로 나뉜다 — **매니페스트만 되돌리기**(GitOps는 유지)와 **GitOps 자체를 끄기**(워크로드는 유지).
+실행 전에는 반드시 되돌릴 것부터 확인한다: `kubectl -n argocd get applications`로 세 Application이
+`Synced`/`Healthy`인지, 문제 커밋이 무엇인지(`git log`)부터 짚는다.
+
+### 1) 매니페스트 롤백 — 특정 커밋만 되돌리기
+
+가장 흔한 케이스. infra `main`에서 문제를 일으킨 커밋만 `git revert`하면, ArgoCD가 다음 폴링
+주기(약 3분)에 자동으로 이전 상태로 되돌린다 — 클러스터에서 아무것도 실행할 필요가 없다.
+
+```bash
+# 로컬 워킹카피에서 (infra main, 최신 pull 후)
+git revert <문제-커밋-sha>
+git push origin main
+```
+
+되돌아왔는지 확인 (iwinv):
+```bash
+ssh -i ~/.ssh/iwinv_lop root@115.68.178.46 '
+  kubectl -n argocd get applications
+  kubectl -n argocd get application backend -o jsonpath="{.status.sync.revision}"
+'
+```
+`sync.revision`이 revert 커밋(되돌린 뒤의 최신 커밋)과 일치하면 완료. 즉시 반영하고 싶으면 3분을
+기다리는 대신 ArgoCD UI(포트포워드, 위 "Access" 절)에서 `backend`/`platform` Application의
+**Refresh**를 누른다 — `kubectl delete application`은 캐스케이드 삭제라 **금지**.
+
+### 2) GitOps 자체를 되돌리기 — Application만 제거, 워크로드는 유지
+
+root-app 등록 자체가 문제(예: 예상 밖의 대량 diff, 계속되는 오싱크)라 GitOps 관리를 통째로 멈추고
+싶을 때. `--cascade=orphan`이 핵심 — 이게 없으면 Application 삭제가 Deployment/Service/ConfigMap
+등 관리 대상 리소스까지 함께 지운다(캐스케이드 삭제), 있으면 **Application 리소스 3개만** 지우고
+Pod/Deployment 등 실제 워크로드는 그대로 살아 있는다(더 이상 ArgoCD가 관리하지 않을 뿐).
+
+```bash
+ssh -i ~/.ssh/iwinv_lop root@115.68.178.46 '
+  kubectl delete application root platform backend -n argocd --cascade=orphan
+  kubectl get pods
+'
+```
+
+이후 워크로드는 마지막으로 동기화된 상태로 계속 돌아간다 — 수동 배포(예전 `rsync` + `kubectl
+apply -k`) 체제로 사실상 돌아가는 것과 같다. GitOps를 다시 켜려면 "root-app 등록" 절을 다시
+수행하면 된다(ArgoCD가 기존 리소스를 다시 흡수한다 — 리소스가 이미 존재하므로 재적용이 안전하다).
+
+### 두 절차의 차이 요약
+
+| | 되돌리는 대상 | ArgoCD 관리 상태 | 워크로드 영향 |
+|---|---|---|---|
+| 1) 매니페스트 revert | 특정 변경 하나 | 유지(계속 GitOps) | 다음 폴링에 이전 상태로 롤링 |
+| 2) `--cascade=orphan` | GitOps 연결 자체 | 해제(Application만 삭제) | 없음(그대로 유지, 이후 수동 관리) |
+
 ## Notes
 - CRDs installed: `applications.argoproj.io`, `applicationsets.argoproj.io`,
   `appprojects.argoproj.io`.
@@ -140,6 +193,11 @@ kubectl apply -f https://raw.githubusercontent.com/Baeinsoo/infrastructure/main/
   설치 전에 기존 워크로드 조사(`kubectl get deploy -A` 등)와 게임서버 이미지 프리풀
   (`crictl pull re5nardo/game-server:<tag>`)을 사전 점검으로 수행했다 — 게임서버는 상시
   Deployment가 아니라 필요 시 동적으로 뜨는 Pod라, 첫 pull이 heartbeat 임계(10초)를 넘기면 부팅
-  전에 회수되는 문제를 예방하기 위함. root-app 등록(아래 "root-app 등록" 절)은 별도 작업(Task 7)
-  으로 아직 하지 않았다 — ArgoCD가 설치돼 있어도 `Application`/`AppProject`가 없으면 아무것도
-  동기화하지 않는다.
+  전에 회수되는 문제를 예방하기 위함.
+- **dev(iwinv) root-app 등록 완료 (2026-08-10, Task 7)**: `root`/`platform`/`backend` 세
+  Application 모두 `Synced`/`Healthy`. 7월 수동 배포 잔재(`mongodb-deployment`/`mongodb-service`/
+  `mongodb-pvc` — 지금 레포 매니페스트에 없어 prune 대상이 아니었다)는 삭제 완료. 이제 dev도
+  local(kind)과 동일하게 GitOps로만 배포한다 — 수동 `rsync`/`kubectl apply -k`, `:latest` 이미지
+  체제는 종료됨. ConfigMap 변경(`game-server-config.env`)만으로 room-server 파드가 **자동
+  재시작**됨을 확인(kustomize `configMapGenerator` 해시 서픽스 + ArgoCD 동기화) — 더 이상
+  "gameserver-deploy 먼저, backend-deploy 나중에" 순서를 지킬 필요가 없다.
