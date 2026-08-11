@@ -229,14 +229,24 @@ apply -k`) 체제로 사실상 돌아가는 것과 같다. GitOps를 다시 켜�
 
 ### dev(iwinv)에 git 밖에 남아 있는 상태 (알려진 수동 산출물)
 
-이 레포로 재구성할 수 없는, 호스트에만 있는 상태 두 가지 — 처음 보는 사람이 서프라이즈로
-발견하지 않도록 여기 남긴다:
+Task 7 직후 남아 있던 잔재(7월 수동 배포가 만든 고아 `game-server-config` ConfigMap, 옛 매니페스트
+트리 사본 `/root/lop-infra/`, 디버그 스크래치 파일들)는 **2026-08-10 정리 작업에서 모두 제거됐다**.
+정리 후에도 이 레포로 재구성할 수 없는, 호스트에만 있는 상태는 아래 하나뿐이다 — 처음 보는 사람이
+서프라이즈로 발견하지 않도록 여기 남긴다:
 
 - **E2E 시드 행**: dev Postgres `Match`/`MatchRound` 테이블에 `test-match-1` /
   `test-match-1-round-0` 행이 상시로 심어져 있다(2026-08-10, Task 7). `scripts/e2e/` 스크립트를
-  돌리기 위한 사전 조건 — 재현 SQL과 이유는 `scripts/e2e/README.md` 참고.
-- **고아 ConfigMap**: 7월 수동 배포가 만든 이름 없는(해시 서픽스 없는) `game-server-config`
-  ConfigMap이 아직 남아 있다. Age 16d(2026-08-10 기준), `GAME_SERVER_IMAGE` 값이 오래된
-  sha(`959ffb4`)로 고정돼 있고, 지금 워크로드는 kustomize가 생성한 해시 서픽스 ConfigMap
-  (`game-server-config-<hash>`)만 참조하므로 **미참조 상태**다. Task 6이 잡은 잔재 목록에
-  없어 Task 7에서는 지우지 않고 남겨 뒀다 — 정리는 별도 작업으로.
+  돌리기 위한 사전 조건이며, 지우지 않고 유지한다 — 재현 SQL과 이유는 `scripts/e2e/README.md` 참고.
+
+그 외 `/root`에는 `e2e.sh`와 `trigger.js` 두 파일만 있고, 둘 다 이 레포의 `scripts/e2e/` 사본과
+byte-identical하다(호스트에서 직접 고치지 말고 레포를 고친 뒤 다시 올릴 것 — `scripts/e2e/README.md`
+참고). 아래는 이번 정리에서 제거된 것들의 기록:
+
+- **고아 ConfigMap 삭제**: 7월 수동 배포가 만든 이름 없는(해시 서픽스 없는) `game-server-config`
+  ConfigMap을 삭제했다. 지금 워크로드는 kustomize가 생성한 해시 서픽스 ConfigMap
+  (`game-server-config-<hash>`)만 참조하므로 그 고아본은 애초에 미참조 상태였다.
+- **`/root/lop-infra/` 삭제**: 7월에 rsync로 올려뒀던 옛 매니페스트 트리 사본(`k8s/apps/`,
+  옛 `root-app.yaml`, mongodb 등 pre-split 레이아웃). 누군가 실수로 이걸 apply했다면 지금의
+  ArgoCD 관리 상태와 충돌했을 것이라 제거했다.
+- **디버그 스크래치 삭제**: `trigger.js.bak-preinternal`, `capture_e2e.sh`, `capture_full.sh`,
+  `full_gs_log.txt`, `spawn-test.sh`, `insert_match.sql`, `insert_round.sql`.

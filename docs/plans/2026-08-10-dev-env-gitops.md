@@ -1,5 +1,8 @@
 # dev 환경(iwinv) GitOps 전환 — 구현 계획
 
+> **구현 완료 (2026-08-10/11).** Task 1~7 모두 완료·검증됨 — 로컬(kind)·dev(iwinv) 두 클러스터 모두
+> GitOps로 운영 중이다. 설계는 `docs/specs/2026-08-10-dev-env-gitops-design.md` 참고.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** infrastructure 매니페스트를 `base/` + `envs/{local,dev}/`로 가르고, iwinv k3s에 자체 ArgoCD를 설치해 지금까지 수동(rsync + `kubectl apply -k`)이던 dev 배포를 GitOps로 전환한다.
