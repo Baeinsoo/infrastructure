@@ -4,6 +4,13 @@
 - 상태: 확정 (구현 전)
 - 범위: 백엔드 서버 3종, Unity 게임서버 이미지, 인프라(DB·Redis·Ingress), Unity 클라이언트 앱/콘텐츠
 
+> **상태 업데이트 (2026-08-10).** 아래 §1 표의 "타깃 환경 = 로컬 k8s, 클라우드 이전은 이후 단계"가
+> 가리키던 그 "이후 단계"가 완료됐다 — dev 환경(iwinv k3s, 공인 IP `115.68.178.46`)이 GitOps로
+> 전환되어 로컬(kind)과 함께 클러스터별 자체 ArgoCD로 운영된다. 이 문서의 결정 사항(§1)과 Phase
+> 0~4(§8)는 **역사적 기록으로 그대로 둔다** — 실제 클라우드 이전의 설계·구조는
+> `docs/specs/2026-08-10-dev-env-gitops-design.md`를 참고할 것. 아래 §5·§9에도 이 전환으로
+> falsify된 구체 서술이 있어 해당 위치에 각각 메모를 남겼다.
+
 ## 1. 목표와 결정 사항
 
 | 항목 | 결정 |
@@ -104,6 +111,13 @@ lop-backend/                          (신규 레포)
 
 ## 5. infrastructure 레포 개편 + ArgoCD
 
+> **상태 업데이트 (2026-08-10).** 아래 트리(`k8s/platform/`, `k8s/apps/backend/`,
+> `k8s/apps/game-server/configmap.yaml`, 단일 `root-app.yaml`)는 이 설계 시점(Phase 1) 및 그 이후
+> 실제 구현의 모습이었으나, dev 환경 GitOps 전환에서 환경 분리가 필요해지며 다시 옮겨졌다. 현재
+> 실제 경로는 `k8s/base/{platform,backend}/` + `k8s/envs/{local,dev}/backend/`(이미지 태그·게임서버
+> 설정만 환경별) + `k8s/argocd/envs/{local,dev}/`(클러스터별 app-of-apps)다. 상세는
+> `docs/specs/2026-08-10-dev-env-gitops-design.md` §3 참고. 아래 트리는 그 이전 단계의 역사적 기록.
+
 ```
 infrastructure/
 ├── k8s/
@@ -128,6 +142,12 @@ infrastructure/
 
 ## 6. 시크릿
 
+> **상태 업데이트 (2026-08-10).** "클라우드 이전 시 SealedSecrets 도입"의 그 클라우드 이전(dev/iwinv)은
+> 일어났지만 SealedSecrets는 **도입되지 않았다** — dev도 로컬과 동일하게 시크릿을 클러스터에 수기
+> 생성하는 방식을 그대로 썼다(`docs/specs/2026-08-10-dev-env-gitops-design.md` §2, §10: SealedSecrets는
+> "운영 환경 단계 과제"로 재차 범위 밖 처리됨). `postgres-secret.yaml` 평문 커밋 부채도 그대로다 —
+> `TODO.md` 항목 E 참고.
+
 - k8s 시크릿(postgres): 로컬 전용 명시 주석 추가 후 git 유지. 클라우드 이전 시 SealedSecrets 도입 (TODO 명문화).
 - GitHub Actions Secrets (신규): Docker Hub 토큰, infrastructure push용 PAT, S3용 AWS 키.
 
@@ -150,6 +170,14 @@ infrastructure/
 | 4 | 클라이언트 앱/콘텐츠 파이프라인 분리 구축 | 검증 5 |
 
 ## 9. 의도적으로 범위에서 제외한 것
+
+> **상태 업데이트 (2026-08-10).** 아래 "클라우드 이전"과 "game-server public IP 하드코딩" 두 항목은
+> dev 환경(iwinv) GitOps 전환으로 처리됐다 — 단 아래 원 서술의 EKS/GKE·관리형 DB·시크릿 매니저까지
+> 전부는 아니다. 실제로는 iwinv **단일 노드 k3s**에 자체 ArgoCD를 설치하는 형태였고, DB는 여전히
+> 클러스터 내 자체 postgres(관리형 아님), 시크릿은 여전히 수기 부트스트랩(매니저 미도입)이다.
+> public IP 하드코딩은 이미 2026-07-12 하드닝에서 ConfigMap 주입 구조로 바뀌어 있었고(README "게임서버
+> 배포" 절), 이번 전환은 그 ConfigMap에 dev의 실제 값(`115.68.178.46`)을 환경별로 채운 것이다. 상세는
+> `docs/specs/2026-08-10-dev-env-gitops-design.md`.
 
 - 클라우드 이전 (EKS/GKE, 관리형 DB, 시크릿 매니저) — Kustomize overlay(`local-k8s`)와 워크플로 구조를 그대로 확장 가능하게 설계
 - 모니터링/알림 (Prometheus, Grafana, Slack)
