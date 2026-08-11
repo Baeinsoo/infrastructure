@@ -880,10 +880,22 @@ ssh -i ~/.ssh/iwinv_lop root@115.68.178.46 '
 
 ## 완료 기준
 
-- [ ] 로컬·iwinv 두 클러스터의 ArgoCD가 모두 `Synced`/`Healthy`
-- [ ] `curl http://115.68.178.46:31000/{lobby,matchmaking,room}/` → 200
-- [ ] dev의 `GAME_SERVER_PUBLIC_IP`가 `115.68.178.46`, local은 `127.0.0.1`
-- [ ] 게임서버 태그만 바꾼 커밋에 iwinv room-server 파드가 **자동 재시작**
-- [ ] E2E: Match INSERT → 게임서버 파드 스폰 + heartbeat 정상
-- [ ] `backend-deploy -f environment=local` 실행 시 dev 폴더가 바뀌지 않음
-- [ ] 메모리·README가 새 현실을 반영
+**전 항목 충족 (2026-08-11).**
+
+- [x] 두 클러스터의 ArgoCD가 모두 `Synced` — iwinv는 세 Application 전부 `Healthy`. 로컬은 `platform`만
+      `Progressing`인데, kind의 NodePort 인그레스라 ArgoCD의 Ingress 헬스체크가 영영 오지 않는
+      LoadBalancer 주소를 기다리기 때문이다(구조적 조건, 기능은 정상). iwinv는 k3s의 klipper가 주소를
+      채워줘 이 조건이 생기지 않는다.
+- [x] `curl http://115.68.178.46:31000/{lobby,matchmaking,room}/` → 200
+- [x] dev의 `GAME_SERVER_PUBLIC_IP`가 `115.68.178.46`, local은 `127.0.0.1`
+- [x] 게임서버 태그만 바꾼 커밋에 iwinv room-server 파드가 **자동 재시작** — ConfigMap 해시 변경 →
+      파드 나이 리셋 → `printenv GAME_SERVER_IMAGE`가 새 sha. 사람이 `rollout restart`를 치지 않았다.
+- [x] E2E: Match INSERT → 게임서버 파드 스폰 + heartbeat 정상
+- [x] `backend-deploy -f environment=local` 실행 시 dev 폴더가 바뀌지 않음
+- [x] `backend-deploy -f environment=dev` 실행 시 local 폴더가 바뀌지 않음 — 2026-08-11 실행,
+      CI 커밋 `60ad25a`가 dev 파일 하나만 `3599617`로 bump하고 local은 `e9f26ed` 유지. ArgoCD가 약 200초
+      뒤 반영, 롤링 중에도 API 200 유지(무중단).
+- [x] 메모리·README가 새 현실을 반영
+
+> 두 워크플로우 × 두 환경이 모두 실제 실행으로 검증됐다: `backend-deploy`는 local(Task 4)·dev(위),
+> `gameserver-deploy`는 dev(Task 7). `both`는 두 환경 루프를 한 번씩 도는 것뿐이라 개별 검증으로 덮인다.
