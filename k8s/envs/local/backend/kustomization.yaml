@@ -9,13 +9,13 @@ images:
   newTag: fb1173a
 - name: re5nardo/lop-db-migrate
   newName: re5nardo/lop-db-migrate
-  newTag: e9f26ed
+  newTag: fb1173a
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: ed3130a
+  newTag: fb1173a
 - name: re5nardo/room-server
   newName: re5nardo/room-server
-  newTag: 42bd338
+  newTag: fb1173a
 configMapGenerator:
 - envs:
   - game-server-config.env
