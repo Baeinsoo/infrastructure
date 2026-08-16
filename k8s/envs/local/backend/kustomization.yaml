@@ -6,7 +6,7 @@ resources:
 images:
 - name: re5nardo/lobby-server
   newName: re5nardo/lobby-server
-  newTag: fb1173a
+  newTag: 02a08f3
 - name: re5nardo/lop-db-migrate
   newName: re5nardo/lop-db-migrate
   newTag: fb1173a
