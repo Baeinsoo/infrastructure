@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
+# 이 머신에 깔린 .NET 런타임이 Luban.dll이 빌드된 버전보다 최신이면 dotnet이 바로 죽는다.
+# LatestMajor로 "설치된 것 중 가장 최신 major로 올려서라도 실행"하게 한다.
+export DOTNET_ROLL_FORWARD=LatestMajor
 LUBAN="tools/Luban/Luban.dll"
 CLIENT_REPO="../../LeagueOfPhysical-MasterData-Client"
 SERVER_REPO="../../LeagueOfPhysical-MasterData-Server"
