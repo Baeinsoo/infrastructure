@@ -12,7 +12,7 @@ images:
   newTag: b8f67e8
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: b8f67e8
+  newTag: "1876494"
 - name: re5nardo/room-server
   newName: re5nardo/room-server
   newTag: b8f67e8
