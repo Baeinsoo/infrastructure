@@ -7,3 +7,8 @@
 이 repo 안에서만 의미 있는 README·운영 절차는 여기에 둔다.
 
 k8s 매니페스트(GitOps 진실원본, ArgoCD)와 MasterData 파이프라인(`table/`).
+
+## 이 repo 전용 규칙
+
+- **새 백엔드 서비스(외부에 노출할 라우트)를 추가하면 `k8s/base/platform/ingress/ingress.yaml`에 경로를 더한다.**
+  local·dev 두 환경이 이 파일을 공유한다(환경별 오버레이 없음). 기존 경로처럼 `/internal`은 막는 정규식을 쓴다(ADR-0011).
