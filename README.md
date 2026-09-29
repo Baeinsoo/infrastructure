@@ -30,7 +30,7 @@ Unity 게임서버(LeagueOfPhysical-Server)는 **셀프호스트 러너(맥)**�
 3. 이 레포의 `k8s/envs/<env>/backend/game-server-config.env`의 `GAME_SERVER_IMAGE`를 그 sha로 bump·push. 이 파일이 환경별 폴더 아래에 있으므로, 이 워크플로에도 어느 환경(local/dev/both)에 반영할지 고르는 environment 선택 입력이 추가된다.
 4. 그 환경의 ArgoCD sync → room-server가 이 env(`configMapGenerator`가 생성한 ConfigMap)를 읽어 새 이미지 사용. room.ip는 `GAME_SERVER_PUBLIC_IP`(같은 ConfigMap, 환경별 `.env`에 고정값 — local `127.0.0.1`, dev는 iwinv 공인 IP) 주입.
 
-**하드닝(2026-07-12):** Mono→**IL2CPP** 전환, **멀티아치**(로컬 arm64 클러스터 네이티브 pod 기동), getPublicIP 하드코딩→ConfigMap 주입. 설계·계획: `docs/specs/2026-07-12-gameserver-il2cpp-multiarch-publicip-design.md`, `docs/plans/2026-07-12-gameserver-il2cpp-multiarch-publicip.md`.
+**하드닝(2026-07-12):** Mono→**IL2CPP** 전환, **멀티아치**(로컬 arm64 클러스터 네이티브 pod 기동), getPublicIP 하드코딩→ConfigMap 주입. 결정: `league-of-physical` repo의 `docs/decisions/0006-gameserver-il2cpp-multiarch.md`(설계는 같은 repo `docs/archive/specs/`).
 
 - **Linux 아키텍처 지정**: `PlayerSettings.SetArchitecture`(iOS전용)·`SetPlatformSettings`로는 안 됨. `UnityEditor.LinuxStandalone.UserBuildSettings.architecture`(리플렉션)로 설정 — BuildScript.cs 참고. arm64 Linux 서버는 IL2CPP 전용(Unity에 arm64 Mono variation 없음). sysroot는 manifest의 `com.unity.sdk.linux-*` 패키지.
 - **base 이미지 = `ubuntu:22.04`**(glibc 2.35). Unity 6 IL2CPP 바이너리가 GLIBC_2.34+ 요구 — 20.04(2.31)로는 pod가 `GLIBC not found`로 죽음.
@@ -99,7 +99,7 @@ k8s/
 1. ingress-nginx 컨트롤러 설치 (부트스트랩, ArgoCD 미관리)
    ```bash
    kubectl apply -f k8s/local-k8s/ingress-nginx-deploy.yaml
-   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=ingress-nginx -n ingress-nginx --timeout=300s
+   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=300s
    ```
    이 매니페스트는 `local-k8s/`에 있지만 로컬 전용이 아니다 — `LoadBalancer` 서비스(`ingress-nginx-controller`)와
    NodePort 서비스(`ingress-nginx-controller-nodeport`, 31000/32000)를 둘 다 정의하고 있어서 dev(k3s)의
@@ -196,7 +196,7 @@ error when creating "ingress.yaml": Internal error occurred: failed calling webh
 kubectl apply -f k8s/local-k8s/ingress-nginx-deploy.yaml
 
 # 2. 완전히 준비될 때까지 대기
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=ingress-nginx -n ingress-nginx --timeout=300s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=300s
 
 # 3. Admission webhook 상태 확인
 kubectl get validatingwebhookconfigurations ingress-nginx-admission
