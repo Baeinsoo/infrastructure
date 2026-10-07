@@ -10,6 +10,7 @@ SERVER_REPO="../../LeagueOfPhysical-MasterData-Server"
 CLIENT_PKG="$CLIENT_REPO/Runtime.Generated"
 SERVER_PKG="$SERVER_REPO/Runtime.Generated"
 MM_PKG="../../lop-backend/apps/matchmaking-server"
+LOBBY_PKG="../../lop-backend/apps/lobby-server"
 
 # Luban이 위 rm -rf로 Scripts/MasterData, StreamingAssets/MasterData를 통째로 지우고
 # 다시 만드는데, 유니티가 만든 .meta 파일은 Luban이 새로 만들어주지 않는다. 그래서 이
@@ -50,5 +51,11 @@ rm -rf "$MM_PKG/src/masterdata" "$MM_PKG/master_data"
 dotnet "$LUBAN" -t matchmaking -c typescript-json -d json --conf luban.conf \
   -x outputCodeDir="$MM_PKG/src/masterdata" \
   -x outputDataDir="$MM_PKG/master_data"
+
+echo "[gen] target=lobby -> lop-backend/apps/lobby-server"
+rm -rf "$LOBBY_PKG/src/masterdata" "$LOBBY_PKG/master_data"
+dotnet "$LUBAN" -t lobby -c typescript-json -d json --conf luban.conf \
+  -x outputCodeDir="$LOBBY_PKG/src/masterdata" \
+  -x outputDataDir="$LOBBY_PKG/master_data"
 
 echo "[done]"

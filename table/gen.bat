@@ -5,6 +5,7 @@ set LUBAN=tools\Luban\Luban.dll
 set CLIENT_PKG=..\..\LeagueOfPhysical-MasterData-Client\Runtime.Generated
 set SERVER_PKG=..\..\LeagueOfPhysical-MasterData-Server\Runtime.Generated
 set MM_PKG=..\..\lop-backend\apps\matchmaking-server
+set LOBBY_PKG=..\..\lop-backend\apps\lobby-server
 
 echo [gen] target=client -^> MasterData-Client package
 if exist "%CLIENT_PKG%\Scripts\MasterData" rmdir /s /q "%CLIENT_PKG%\Scripts\MasterData"
@@ -36,6 +37,17 @@ dotnet %LUBAN% -t matchmaking -c typescript-json -d json --conf luban.conf ^
   -x outputDataDir=%MM_PKG%\master_data
 if errorlevel 1 (
   echo [error] target=matchmaking generation failed
+  exit /b 1
+)
+
+echo [gen] target=lobby -^> lop-backend/apps/lobby-server
+if exist "%LOBBY_PKG%\src\masterdata" rmdir /s /q "%LOBBY_PKG%\src\masterdata"
+if exist "%LOBBY_PKG%\master_data" rmdir /s /q "%LOBBY_PKG%\master_data"
+dotnet %LUBAN% -t lobby -c typescript-json -d json --conf luban.conf ^
+  -x outputCodeDir=%LOBBY_PKG%\src\masterdata ^
+  -x outputDataDir=%LOBBY_PKG%\master_data
+if errorlevel 1 (
+  echo [error] target=lobby generation failed
   exit /b 1
 )
 
