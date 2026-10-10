@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lobby-economy-reconcile
+spec:
+  schedule: "17 18 * * *" # UTC 18:17 = KST 03:17
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 7
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: reconcile
+            image: re5nardo/lobby-server:latest
+            command: ["node", "dist/jobs/reconcile.js"]
+            envFrom:
+            - configMapRef:
+                name: lobby-server-config
+            - secretRef:
+                name: postgres-secret
+            - secretRef:
+                name: auth-secret
+            - secretRef:
+                name: internal-api-secret

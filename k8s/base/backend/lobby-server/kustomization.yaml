@@ -4,3 +4,4 @@ resources:
 - lobby-server-configmap.yaml
 - lobby-server-deployment.yaml
 - lobby-server-service.yaml
+- reconcile-cronjob.yaml
