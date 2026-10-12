@@ -1,0 +1,53 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: lop-db
+spec:
+  instances: 1 # 오버레이가 덮는다
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.6 # 옛 DB가 17.2 — 같은 메이저여야 import 뒤 호환
+  storage:
+    size: 2Gi
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: lop
+      owner: lop_migrator
+      secret:
+        name: lop-db-migrator
+      # lop_migrator가 lop_app에 ALTER ROLE ... SET(타임아웃 등)을 걸려면 lop_app의 멤버여야 한다
+      # (PG16+ 규칙 — CREATEROLE만으론 부족하고, 자신이 만들지 않은 롤을 바꾸려면 ADMIN OPTION으로
+      # 그 롤에 속해 있어야 함). 이 SQL은 initdb 부트스트랩 중 postgres superuser로 돈다 — 그런데
+      # managed.roles(아래)의 lop_app 생성은 **별도의, 이후에 도는 리컨실 루프**라 이 시점엔 lop_app이
+      # 아직 없을 수 있다(CNPG 문서가 이 둘의 선후를 명시하지 않음 — 확인 못 함). 그래서 먼저 빈 롤로
+      # 만들어 두면(이미 있어도 안전) 리컨실 루프가 나중에 ALTER ROLE로 login/password를 채운다.
+      postInitApplicationSQL:
+        - "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'lop_app') THEN CREATE ROLE lop_app; END IF; END $$"
+        - "GRANT lop_app TO lop_migrator WITH ADMIN OPTION"
+      # import 블록은 전환(Task 5) 때 오버레이 패치로 붙이고, 끝나면 뗀다 — 두 번째 생성부터는 recovery/initdb가 아니라 기존 PVC.
+      # ⚠️ import 경로(Task 5의 microservice import)는 initdb가 아니라 import 단계에서 돌아 postInitApplicationSQL이
+      # 적용되지 않는다 — 그 경로는 대신 postImportApplicationSQL에 위 두 줄을 그대로 넣어야 한다(Task 5에서 반영).
+  managed:
+    roles:
+      - name: lop_migrator
+        ensure: present
+        login: true
+        superuser: false
+        createrole: true # lop_app에 ALTER ROLE ... SET(타임아웃 등)을 걸려면 CREATEROLE + lop_app의 ADMIN OPTION 멤버십이 필요
+        passwordSecret:
+          name: lop-db-migrator
+        comment: "마이그레이션 전용 — 앱 DB 소유자"
+      - name: lop_app
+        ensure: present
+        login: true
+        superuser: false
+        passwordSecret:
+          name: lop-db-app-user
+        comment: "앱 전용 — 원장 UPDATE/DELETE 불가"
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: lop-db-backup
+  postgresql:
+    parameters:
+      archive_timeout: "300s" # 쓰기가 적어도 5분마다 WAL을 닫아 보낸다 → RPO ≤ 5분

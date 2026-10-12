@@ -1,0 +1,38 @@
+# 로컬 전용 — CNPG(CloudNativePG) WAL·백업이 s3://로 쓰는 대상을 호스트에 올려 흉내 낸다.
+# dev/운영은 실제 S3(ap-northeast-2)를 쓴다 — 이 compose는 kind 클러스터 밖, 호스트 도커에서 돈다.
+#
+# 이미지 메모(2026-10-12): MinIO는 2025-10에 공식 "소스 전용 배포"로 전환해
+# docker.io/minio/minio·quay.io/minio/minio를 포함한 공식 컨테이너 이미지 배포를 전부 중단했다
+# (https://github.com/minio/minio/issues/21647). 브리프가 지정한 두 공식 태그
+# (minio/minio:RELEASE.2025-09-07T16-13-09Z, minio/mc:RELEASE.2025-08-13T08-35-41Z)는
+# docker.io·quay.io 양쪽에서 더 이상 받을 수 없어(둘 다 미설치 확인됨) 대체했다:
+#   - 서버: coollabsio/minio — 같은 업스트림 소스를 그대로 빌드해 올리는 커뮤니티 미러
+#     (위 이슈에서 메인테이너가 직접 링크). 태그는 실제 minio 릴리스 태그(RELEASE.2025-10-15T17-29-55Z)를
+#     그대로 따라가 추적 가능하다.
+#   - 버킷 생성: mc 대신 amazon/aws-cli(AWS 공식 배포) — S3 호환 엔드포인트는 어떤 S3 클라이언트든
+#     동작하므로 mc 미러를 따로 찾을 필요가 없다.
+services:
+  minio:
+    image: coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: lopminio
+      MINIO_ROOT_PASSWORD: lopminio-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - "./data:/data"
+  mkbucket:
+    image: amazon/aws-cli:2.37.12
+    depends_on: [minio]
+    environment:
+      AWS_ACCESS_KEY_ID: lopminio
+      AWS_SECRET_ACCESS_KEY: lopminio-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until aws --endpoint-url http://minio:9000 s3 ls >/dev/null 2>&1; do sleep 1; done
+        aws --endpoint-url http://minio:9000 s3 mb s3://lop-db-backup || true

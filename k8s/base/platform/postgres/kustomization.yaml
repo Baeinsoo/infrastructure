@@ -1,7 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # 옛 postgres(일반 Deployment) — Task 6에서 전환 끝나면 제거
   - postgres-secret.yaml
   - postgres-pvc.yaml
   - postgres-deployment.yaml
   - postgres-service.yaml
+  # 새 postgres(CNPG Cluster lop-db)
+  - cluster.yaml
+  - objectstore.yaml
+  - scheduledbackup.yaml
+  - app-user-secret.yaml
+  - migrator-secret.yaml
