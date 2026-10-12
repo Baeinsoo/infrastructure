@@ -14,16 +14,30 @@ spec:
       initContainers:
         - name: wait-for-postgres
           image: busybox:1.36
-          command: ['sh', '-c', 'until nc -z postgres-service 5432; do echo "waiting for postgres..."; sleep 2; done']
+          command: ['sh', '-c', 'until nc -z lop-db-rw 5432; do echo "waiting for postgres..."; sleep 2; done']
       containers:
         - name: db-migrate
           image: re5nardo/lop-db-migrate:latest
           imagePullPolicy: Always
           env:
-            - name: POSTGRES_PASSWORD
+            - name: MIGRATOR_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_PASSWORD
+                  name: lop-db-migrator
+                  key: password
             - name: DATABASE_URL
-              value: "postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-service:5432/postgres?schema=public"
+              value: "postgresql://lop_migrator:$(MIGRATOR_PASSWORD)@lop-db-rw:5432/lop?schema=public"
+          # 이미지 기본 CMD(re5nardo/lop-db-migrate — packages/database/Dockerfile)는
+          # "pnpm run migrate:deploy && pnpm run seed"이고 WORKDIR은 /repo/packages/database,
+          # 스키마는 그 아래 prisma/schema.prisma다(이미지를 직접 띄워 확인, 2026-10-12).
+          # 그 CMD 그대로에 "마이그레이션 직전 복원점"만 앞에 얹는다.
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              TAG="${IMAGE_TAG:-unknown}"
+              # 배포 전 복원점 — 마이그레이션이 잘못돼도 이 이름(targetName)으로 되돌릴 수 있다.
+              # 실패해도(예: 권한 문제) 배포는 계속되게 경고만 남긴다.
+              echo "SELECT pg_create_restore_point('pre-migrate-${TAG}');" | npx prisma db execute --stdin --schema prisma/schema.prisma || echo "WARN: restore point 실패"
+              pnpm run migrate:deploy
+              pnpm run seed
