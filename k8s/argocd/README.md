@@ -25,12 +25,14 @@ k8s/argocd/
 │   ├── local/
 │   │   ├── root-app.yaml   # app-of-apps 루트 (argocd 네임스페이스가 관리) → k8s/argocd/envs/local/apps
 │   │   └── apps/
-│   │       ├── platform.yaml # sync-wave "0" — DB/redis/ingress/RBAC (k8s/base/platform)
+│   │       ├── operators.yaml # sync-wave "-1" — cert-manager·CNPG·Barman Cloud 플러그인 (k8s/base/operators)
+│   │       ├── platform.yaml # sync-wave "0" — DB(CNPG)/redis/ingress/RBAC (k8s/envs/local/platform)
 │   │       └── backend.yaml  # sync-wave "1" — lobby/matchmaking/room + db-migrate (k8s/envs/local/backend)
 │   └── dev/
 │       ├── root-app.yaml   # → k8s/argocd/envs/dev/apps
 │       └── apps/
-│           ├── platform.yaml # sync-wave "0" — k8s/base/platform (local과 완전히 동일한 파일)
+│           ├── operators.yaml # sync-wave "-1" — k8s/base/operators (local과 완전히 동일한 파일)
+│           ├── platform.yaml # sync-wave "0" — k8s/envs/dev/platform
 │           └── backend.yaml  # sync-wave "1" — k8s/envs/dev/backend
 └── install/              # ArgoCD 자체 설치 절차 (부트스트랩, ArgoCD 밖에서 관리)
 ```
@@ -45,7 +47,8 @@ k8s/argocd/
 | Application | local | dev |
 |---|---|---|
 | `root`(source path) | `k8s/argocd/envs/local/apps` | `k8s/argocd/envs/dev/apps` |
-| `platform`(source path) | `k8s/base/platform` | `k8s/base/platform` (동일) |
+| `operators`(source path) | `k8s/base/operators` | `k8s/base/operators` (동일) |
+| `platform`(source path) | `k8s/envs/local/platform` | `k8s/envs/dev/platform` |
 | `backend`(source path) | `k8s/envs/local/backend` | `k8s/envs/dev/backend` |
 | destination cluster | `https://kubernetes.default.svc` (kind, 컨텍스트 `kind-lop`) | `https://kubernetes.default.svc` (iwinv k3s, `115.68.178.46`) |
 
@@ -55,8 +58,14 @@ k8s/argocd/
 
 ## sync-wave 순서
 
-1. **wave 0 — platform**: postgres/redis/ingress-nginx-경유 리소스/RBAC가 먼저 배포된다(mongodb는
-   이 프로젝트가 GitOps로 넘어오기 전에 매니페스트에서 제거됐다 — 지금 `k8s/base/platform`에 없다).
+0. **wave -1 — operators**: cert-manager · CloudNativePG · Barman Cloud 플러그인(`k8s/base/operators`,
+   네임스페이스 `cnpg-system`, SSA). platform의 CNPG `Cluster`/`ObjectStore`/`ScheduledBackup` CRD가
+   여기서 먼저 설치되어야 한다.
+1. **wave 0 — platform**: postgres(CNPG `Cluster lop-db` + 옛 Deployment 병행, Task 6에서 옛 것 제거)
+   /redis/ingress-nginx-경유 리소스/RBAC가 배포된다(mongodb는 이 프로젝트가 GitOps로 넘어오기 전에
+   매니페스트에서 제거됐다 — 지금 `k8s/base/platform`에 없다). **source path가 환경마다 다르다**
+   (`k8s/envs/<env>/platform` — base를 그대로 쓰던 이전과 달리, local(MinIO)/dev(S3) 백업 저장소
+   오버레이가 env별로 갈린다. 위 "두 환경의 path 대응표" 참고).
 2. **wave 1 — backend**: platform이 Synced 된 뒤 적용. `db-migrate` Job은 `PreSync` hook으로 등록되어 있어 lobby/matchmaking/room 서버 Deployment보다 먼저 실행되고, 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기한다 (sync-wave와 이중 안전장치).
 
 ## 접속법

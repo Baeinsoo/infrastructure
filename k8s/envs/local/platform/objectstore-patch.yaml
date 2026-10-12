@@ -1,0 +1,3 @@
+- op: replace
+  path: /spec/configuration/endpointURL
+  value: http://host.docker.internal:9000

@@ -1,5 +1,8 @@
 table/_gen_scratch/
 
+# 로컬 MinIO(docker-compose) 데이터 — 호스트 바인드 마운트, 레포에 커밋하지 않는다
+k8s/local-k8s/minio/data/
+
 # SDD 진행 레저/리뷰 산출물 (로컬 전용)
 .superpowers/
 .DS_Store
