@@ -10,3 +10,9 @@
   path: /spec/walStorage
   value:
     size: 1Gi
+# 백업 저장소 안의 이 클러스터 폴더 이름. 기본값은 클러스터 이름(lop-db)인데, 복구 훈련(10-12)으로 백업에서
+# 되살린 클러스터는 옛 폴더(lop-db)에 WAL을 이어 쓸 수 없어 새 폴더로 시작했다. 복원할 때마다 이 값을 바꾼다
+# (예: lop-db-YYYYMMDD) — docs/db-operations.md "복구" 절.
+- op: add
+  path: /spec/plugins/0/parameters/serverName
+  value: lop-db-20261012
