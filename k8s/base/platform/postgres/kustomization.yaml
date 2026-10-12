@@ -1,7 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # 옛 postgres(일반 Deployment) — Task 6에서 전환 끝나면 제거
   - postgres-secret.yaml
   - postgres-pvc.yaml
   - postgres-deployment.yaml
   - postgres-service.yaml
+  # 새 postgres(CNPG Cluster lop-db)는 여기 없다 — ../postgres-cnpg/ 에 따로 있다.
+  # dev의 platform 앱이 base/platform을 직결 참조(k8s/argocd/envs/dev/apps/platform.yaml)하므로,
+  # 여기 넣으면 dev에도 CNPG가 들어간다. base/platform/kustomization.yaml은 postgres-cnpg를
+  # 끌어오지 않고, k8s/envs/local/platform/kustomization.yaml만 그 디렉터리를 base로 추가
+  # 참조한다(local만). dev가 CNPG로 전환할 때 base/platform/kustomization.yaml에 postgres-cnpg를
+  # 추가하고 이 postgres(옛것)는 뺀다.
