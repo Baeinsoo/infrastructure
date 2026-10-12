@@ -26,12 +26,14 @@ spec:
       # 남기고 계속 진행하게 짜여 있지만, 그러면 복원점이 매번 조용히 안 생긴다). 그래서 EXECUTE를
       # 명시적으로 내려준다.
       postInitApplicationSQL:
-        - "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'lop_app') THEN CREATE ROLE lop_app; END IF; END $$"
+        # 부트스트랩 시점엔 lop_app이 없다(initdb는 빈 클러스터, import는 롤을 안 가져온다). DO $$…$$ 블록은
+        # CNPG가 이 SQL을 실행하는 방식에서 "syntax error at or near $"로 깨진다(10-12 실측) → 조건 없이 만든다.
+        - "CREATE ROLE lop_app LOGIN"
         - "GRANT lop_app TO lop_migrator WITH ADMIN OPTION"
         - "GRANT EXECUTE ON FUNCTION pg_create_restore_point(text) TO lop_migrator"
       # import 블록은 전환(Task 5) 때 오버레이 패치로 붙이고, 끝나면 뗀다 — 두 번째 생성부터는 recovery/initdb가 아니라 기존 PVC.
-      # ⚠️ import 경로(Task 5의 microservice import)는 initdb가 아니라 import 단계에서 돌아 postInitApplicationSQL이
-      # 적용되지 않는다 — 그 경로는 대신 postImportApplicationSQL에 위 세 줄을 그대로 넣어야 한다(Task 5에서 반영).
+      # import 경로에서도 postInitApplicationSQL은 돈다(10-12 실측: import 파드 로그 "init Application queries").
+      # 그래서 postImportApplicationSQL에는 CREATE ROLE을 다시 넣지 않는다(두 번째 생성은 "already exists"로 깨짐).
   managed:
     roles:
       - name: lop_migrator
