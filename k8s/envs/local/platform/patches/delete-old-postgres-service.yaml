@@ -1,0 +1,6 @@
+# 옛 postgres(일반 Deployment)는 local에서 CNPG로 전환됐다(10-12) — base에는 dev 때문에 남아 있어 여기서만 뺀다.
+$patch: delete
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
