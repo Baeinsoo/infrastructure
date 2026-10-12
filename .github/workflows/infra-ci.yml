@@ -24,6 +24,12 @@ jobs:
           count=$(kubectl kustomize k8s/envs/local/backend | grep -o "lop-db-rw" | wc -l)
           [ "$count" -eq 7 ] || { echo "lop-db-rw 참조 개수가 7이 아님: $count"; exit 1; }
           kubectl kustomize k8s/envs/local/backend | grep -c "name: postgres-secret" | grep -qx 0
+          # 대사 잡 출석 신호: local엔 시크릿이 있고 자리표시자가 아니어야 한다(REPLACE-ME가 머지되면 신호가
+          # 조용히 안 간다). base CronJob의 env(RECONCILE_HEARTBEAT_URL)가 local 패치의 env와 합쳐져야 한다.
+          # "name: reconcile-heartbeat" 2곳 = CronJob의 secretKeyRef + Secret 리소스 자체
+          kubectl kustomize k8s/envs/local/backend | grep -c "name: reconcile-heartbeat$" | grep -qx 2
+          kubectl kustomize k8s/envs/local/backend | grep -c "REPLACE-ME" | grep -qx 0
+          kubectl kustomize k8s/envs/local/backend | grep -q "RECONCILE_HEARTBEAT_URL"
       - name: dev 백엔드는 이번 전환으로 안 바뀌었는지
         run: |
           set -e
@@ -32,6 +38,9 @@ jobs:
           kubectl kustomize k8s/envs/dev/backend | grep -q "name: postgres-secret"
           kubectl kustomize k8s/envs/dev/backend | grep -q "postgres-service"
           kubectl kustomize k8s/envs/dev/backend | grep -c "lop-db-rw" | grep -qx 0
+          # dev엔 아직 출석 신호 시크릿이 없다(optional이라 잡은 그대로 돈다) — 실수로 끼어들면 잡는다.
+          # 1곳 = CronJob의 secretKeyRef뿐(Secret 리소스 없음)
+          kubectl kustomize k8s/envs/dev/backend | grep -c "name: reconcile-heartbeat$" | grep -qx 1
       - name: base/platform에 CNPG Cluster가 안 섞여 들어갔는지 (dev 무변경 보장)
         run: |
           set -e

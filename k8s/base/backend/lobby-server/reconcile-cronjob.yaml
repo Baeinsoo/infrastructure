@@ -17,6 +17,15 @@ spec:
           - name: reconcile
             image: re5nardo/lobby-server:latest
             command: ["node", "dist/jobs/reconcile.js"]
+            env:
+            # 출석 신호(healthchecks.io) 주소. 시크릿이 없는 환경(optional)에선 변수가 비고, 잡은 신호 없이
+            # 검산만 한다 — 환경마다 체크를 따로 만들고 그 환경 오버레이에 시크릿을 둔다(local은 둠, dev는 아직).
+            - name: RECONCILE_HEARTBEAT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: reconcile-heartbeat
+                  key: url
+                  optional: true
             envFrom:
             - configMapRef:
                 name: lobby-server-config
