@@ -1,0 +1,17 @@
+name: infra-ci
+on: { pull_request: { paths: ['k8s/**'] }, push: { branches: [main], paths: ['k8s/**'] } }
+jobs:
+  kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: kustomize build (모든 오버레이)
+        run: |
+          set -e
+          for d in k8s/base/operators k8s/envs/local/platform k8s/envs/dev/platform k8s/envs/local/backend k8s/envs/dev/backend; do
+            echo "== $d"; kubectl kustomize "$d" > /tmp/out.yaml
+          done
+      - name: Cluster에 plugins·managed.roles가 있는지
+        run: |
+          kubectl kustomize k8s/envs/local/platform | yq 'select(.kind=="Cluster") | .spec.plugins[0].name' | grep -q barman-cloud
+          kubectl kustomize k8s/envs/local/platform | yq 'select(.kind=="Cluster") | .spec.managed.roles[].name' | grep -q lop_app
