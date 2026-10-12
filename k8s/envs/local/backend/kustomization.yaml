@@ -20,3 +20,12 @@ configMapGenerator:
 - envs:
   - game-server-config.env
   name: game-server-config
+patches:
+# base는 옛 postgres-secret/postgres-service를 그대로 둔다(dev가 base를 직결 참조하므로
+# base를 고치면 dev도 같이 바뀐다) — DB 접속을 CNPG로 바꾸는 건 local 오버레이 패치로만.
+- path: patches/lobby-server-db.yaml
+- path: patches/reconcile-cronjob-db.yaml
+- path: patches/matchmaking-server-db.yaml
+- path: patches/matchmaking-director-db.yaml
+- path: patches/room-server-db.yaml
+- path: patches/db-migrate-db.yaml

@@ -49,6 +49,17 @@ docker exec lop-control-plane curl -s http://host.docker.internal:9000/minio/hea
 Docker Desktop이 띄운 컨테이너라 별도 설정 없이 자동으로 풀린다 — 연결이 안 되면 보통 MinIO
 컨테이너가 안 떠 있거나(`docker compose ps`) 방화벽이 9000 포트를 막은 경우다.
 
+위 확인은 **노드 컨테이너**(`docker exec`) 기준이다. CNPG가 실제로 쓰는 경로는 **파드 안**(CNI
+네트워크 네임스페이스, 노드와 라우팅/DNS가 다를 수 있음)이라 따로 확인한다:
+
+```bash
+kubectl --context kind-lop run --rm -it curl --image=curlimages/curl --restart=Never -- \
+  curl -s http://host.docker.internal:9000/minio/health/live
+```
+
+이 파드가 끝까지 응답을 못 받고 멈추면(노드 확인은 됐는데 이것만 실패하면) CNI 쪽에서
+`host.docker.internal`이 안 풀리거나 막힌 경우다 — kind 네트워크 설정을 다시 본다.
+
 ## 콘솔
 
 ```
