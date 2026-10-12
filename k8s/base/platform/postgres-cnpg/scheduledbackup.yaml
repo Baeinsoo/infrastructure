@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: lop-db-nightly
+spec:
+  schedule: "0 0 19 * * *" # 6필드(초 포함). 19:00 UTC = 04:00 KST
+  backupOwnerReference: self
+  cluster:
+    name: lop-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  immediate: true
+  target: prefer-standby

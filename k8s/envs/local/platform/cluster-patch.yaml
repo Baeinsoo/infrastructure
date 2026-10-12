@@ -1,0 +1,12 @@
+- op: replace
+  path: /spec/instances
+  value: 1
+- op: replace
+  path: /spec/storage/size
+  value: 2Gi
+# WAL을 데이터와 분리된 볼륨에 둔다(CNPG 권장 — WAL이 데이터 볼륨의 I/O와 경합하지 않게).
+# 로컬은 작게(1Gi)만 떼어 둔다.
+- op: add
+  path: /spec/walStorage
+  value:
+    size: 1Gi

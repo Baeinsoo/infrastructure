@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+resources:
+  - ../../../base/platform
+  # CNPG 리소스는 별도 base(postgres-cnpg)에 있다 — base/platform/kustomization.yaml이 그 디렉터리를
+  # 끌어오지 않으므로 dev(base/platform을 직결 참조)는 CNPG를 받지 않는다. local만 여기서 추가로 끌어온다.
+  - ../../../base/platform/postgres-cnpg
+  - backup-creds-secret.yaml
+patches:
+  - path: cluster-patch.yaml
+    target:
+      kind: Cluster
+      name: lop-db
+  - path: objectstore-patch.yaml
+    target:
+      kind: ObjectStore
+      name: lop-db-backup
