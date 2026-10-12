@@ -41,3 +41,9 @@ jobs:
           kubectl kustomize k8s/base/platform | grep -c "^kind: Cluster$" | grep -qx 0
           kubectl kustomize k8s/base/platform | grep -c "^kind: ObjectStore$" | grep -qx 0
           kubectl kustomize k8s/base/platform | grep -c "^kind: ScheduledBackup$" | grep -qx 0
+          # local 전환 뒤 옛 postgres는 local 오버레이에서만 지우고 PVC만 Prune=false로 남긴다 —
+          # base에 그 주석이 들어가면 dev PVC까지 바뀐다(10-12 리뷰에서 실제로 새어 나갔다).
+          kubectl kustomize k8s/base/platform | grep -c "Prune=false" | grep -qx 0
+          kubectl kustomize k8s/base/platform | grep -q "name: postgres-deployment"
+          kubectl kustomize k8s/envs/local/platform | grep -c "name: postgres-deployment" | grep -qx 0
+          kubectl kustomize k8s/envs/local/platform | grep -c "Prune=false" | grep -qx 1

@@ -17,3 +17,7 @@ patches:
 - path: patches/delete-old-postgres-deployment.yaml
 - path: patches/delete-old-postgres-service.yaml
 - path: patches/delete-old-postgres-secret.yaml
+- path: patches/keep-old-postgres-pvc.yaml
+  target:
+    kind: PersistentVolumeClaim
+    name: postgres-pvc
