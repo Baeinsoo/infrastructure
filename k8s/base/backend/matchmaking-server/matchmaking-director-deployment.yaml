@@ -21,25 +21,10 @@ spec:
         image: re5nardo/matchmaking-server:latest
         # 매칭 서버와 같은 이미지의 두 번째 진입점 — 둘이 항상 같은 커밋이라 스키마 불일치가 구조적으로 불가능하다.
         command: ["node", "dist/director.js"]
-        env:
-        - name: POSTGRES_HOST
-          value: lop-db-rw
-        - name: POSTGRES_PORT
-          value: "5432"
-        - name: POSTGRES_DATABASE
-          value: lop
-        - name: POSTGRES_USER
-          valueFrom:
-            secretKeyRef:
-              name: lop-db-app-user
-              key: username
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: lop-db-app-user
-              key: password
         envFrom:
         - configMapRef:
             name: matchmaking-server-config
+        - secretRef:
+            name: postgres-secret
         - secretRef:
             name: internal-api-secret

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matchmaking-server
+spec:
+  template:
+    spec:
+      containers:
+      - name: matchmaking-server
+        envFrom:
+        - configMapRef:
+            name: matchmaking-server-config
+        - secretRef:
+            name: auth-secret
+        - secretRef:
+            name: internal-api-secret
+        env:
+        - name: POSTGRES_HOST
+          value: lop-db-rw
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DATABASE
+          value: lop
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: lop-db-app-user
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: lop-db-app-user
+              key: password

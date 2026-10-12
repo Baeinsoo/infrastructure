@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lobby-economy-reconcile
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: reconcile
+            envFrom:
+            - configMapRef:
+                name: lobby-server-config
+            - secretRef:
+                name: auth-secret
+            - secretRef:
+                name: internal-api-secret
+            env:
+            - name: POSTGRES_HOST
+              value: lop-db-rw
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DATABASE
+              value: lop
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: lop-db-app-user
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: lop-db-app-user
+                  key: password
