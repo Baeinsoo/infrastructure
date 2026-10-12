@@ -22,3 +22,11 @@ spec:
       # CNPG CRD는 client-side apply가 쓰는 주석(last-applied-configuration) 크기 한도를 넘는다 → server-side apply로 적용
       - CreateNamespace=true
       - ServerSideApply=true
+    # CRD 90개를 한 번에 올리는 첫 sync는 API 서버가 일시적으로 바쁘거나(webhook 등록 중 등)
+    # 실패하는 경우가 있다 — 수동 재시도 없이 지수 백오프로 스스로 복구하게 한다.
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

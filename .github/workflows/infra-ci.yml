@@ -15,7 +15,7 @@ jobs:
         run: |
           kubectl kustomize k8s/envs/local/platform | yq 'select(.kind=="Cluster") | .spec.plugins[0].name' | grep -q barman-cloud
           kubectl kustomize k8s/envs/local/platform | yq 'select(.kind=="Cluster") | .spec.managed.roles[].name' | grep -q lop_app
-      - name: 백엔드 워크로드가 옛 postgres-service 대신 lop-db-rw를 보는지
+      - name: local 백엔드가 옛 postgres-service 대신 lop-db-rw를 보는지
         run: |
           set -e
           # lop-db-rw 참조 7곳 — lobby-server/matchmaking-server/matchmaking-director/room-server
@@ -24,3 +24,20 @@ jobs:
           count=$(kubectl kustomize k8s/envs/local/backend | grep -o "lop-db-rw" | wc -l)
           [ "$count" -eq 7 ] || { echo "lop-db-rw 참조 개수가 7이 아님: $count"; exit 1; }
           kubectl kustomize k8s/envs/local/backend | grep -c "name: postgres-secret" | grep -qx 0
+      - name: dev 백엔드는 이번 전환으로 안 바뀌었는지
+        run: |
+          set -e
+          # dev는 base/backend를 patch 없이 그대로 받는다 — postgres-service/postgres-secret 그대로,
+          # lop-db-rw는 전혀 없어야 한다.
+          kubectl kustomize k8s/envs/dev/backend | grep -q "name: postgres-secret"
+          kubectl kustomize k8s/envs/dev/backend | grep -q "postgres-service"
+          kubectl kustomize k8s/envs/dev/backend | grep -c "lop-db-rw" | grep -qx 0
+      - name: base/platform에 CNPG Cluster가 안 섞여 들어갔는지 (dev 무변경 보장)
+        run: |
+          set -e
+          # unanchored "kind: Cluster"는 ClusterRole/ClusterRoleBinding도 집어서 오탐한다 — 정확히
+          # "kind: Cluster"인 줄만 센다. base/platform은 dev의 platform 앱이 직결 참조하므로,
+          # 여기 CNPG Cluster/ObjectStore/ScheduledBackup이 보이면 dev에도 CNPG가 같이 깔린 것이다.
+          kubectl kustomize k8s/base/platform | grep -c "^kind: Cluster$" | grep -qx 0
+          kubectl kustomize k8s/base/platform | grep -c "^kind: ObjectStore$" | grep -qx 0
+          kubectl kustomize k8s/base/platform | grep -c "^kind: ScheduledBackup$" | grep -qx 0

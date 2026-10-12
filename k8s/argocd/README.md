@@ -31,8 +31,7 @@ k8s/argocd/
 │   └── dev/
 │       ├── root-app.yaml   # → k8s/argocd/envs/dev/apps
 │       └── apps/
-│           ├── operators.yaml # sync-wave "-1" — k8s/base/operators (local과 완전히 동일한 파일)
-│           ├── platform.yaml # sync-wave "0" — k8s/envs/dev/platform
+│           ├── platform.yaml # sync-wave "0" — k8s/base/platform (CNPG 미적용, local과 다름)
 │           └── backend.yaml  # sync-wave "1" — k8s/envs/dev/backend
 └── install/              # ArgoCD 자체 설치 절차 (부트스트랩, ArgoCD 밖에서 관리)
 ```
@@ -47,8 +46,8 @@ k8s/argocd/
 | Application | local | dev |
 |---|---|---|
 | `root`(source path) | `k8s/argocd/envs/local/apps` | `k8s/argocd/envs/dev/apps` |
-| `operators`(source path) | `k8s/base/operators` | `k8s/base/operators` (동일) |
-| `platform`(source path) | `k8s/envs/local/platform` | `k8s/envs/dev/platform` |
+| `operators`(source path) | `k8s/base/operators` | **없음** — dev는 아직 CNPG로 전환하지 않음(이 Application 자체가 dev에는 없다) |
+| `platform`(source path) | `k8s/envs/local/platform` | `k8s/base/platform` (CNPG 미적용 — 옛 postgres Deployment 그대로) |
 | `backend`(source path) | `k8s/envs/local/backend` | `k8s/envs/dev/backend` |
 | destination cluster | `https://kubernetes.default.svc` (kind, 컨텍스트 `kind-lop`) | `https://kubernetes.default.svc` (iwinv k3s, `115.68.178.46`) |
 
@@ -58,15 +57,29 @@ k8s/argocd/
 
 ## sync-wave 순서
 
-0. **wave -1 — operators**: cert-manager · CloudNativePG · Barman Cloud 플러그인(`k8s/base/operators`,
-   네임스페이스 `cnpg-system`, SSA). platform의 CNPG `Cluster`/`ObjectStore`/`ScheduledBackup` CRD가
-   여기서 먼저 설치되어야 한다.
-1. **wave 0 — platform**: postgres(CNPG `Cluster lop-db` + 옛 Deployment 병행, Task 6에서 옛 것 제거)
-   /redis/ingress-nginx-경유 리소스/RBAC가 배포된다(mongodb는 이 프로젝트가 GitOps로 넘어오기 전에
-   매니페스트에서 제거됐다 — 지금 `k8s/base/platform`에 없다). **source path가 환경마다 다르다**
-   (`k8s/envs/<env>/platform` — base를 그대로 쓰던 이전과 달리, local(MinIO)/dev(S3) 백업 저장소
-   오버레이가 env별로 갈린다. 위 "두 환경의 path 대응표" 참고).
-2. **wave 1 — backend**: platform이 Synced 된 뒤 적용. `db-migrate` Job은 `PreSync` hook으로 등록되어 있어 lobby/matchmaking/room 서버 Deployment보다 먼저 실행되고, 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기한다 (sync-wave와 이중 안전장치).
+**local과 dev가 여기서부터 갈린다 — dev는 이번 CNPG 전환에서 아무것도 안 바뀐다.**
+
+- **local**:
+  0. **wave -1 — operators**: cert-manager · CloudNativePG · Barman Cloud 플러그인(`k8s/base/operators`,
+     네임스페이스 `cnpg-system`, SSA). platform의 CNPG `Cluster`/`ObjectStore`/`ScheduledBackup` CRD가
+     여기서 먼저 설치되어야 한다.
+  1. **wave 0 — platform**: `k8s/envs/local/platform` — postgres가 CNPG `Cluster lop-db`(+ 옛
+     Deployment 병행, Task 6에서 옛 것 제거)이고 MinIO를 백업 저장소로 쓴다. CNPG 리소스는
+     `k8s/base/platform/postgres-cnpg`(별도 base, `k8s/base/platform/kustomization.yaml`이 끌어오지
+     않음)에 있고 local 오버레이만 그걸 추가로 참조한다 — 그래서 dev(아래)는 안 받는다.
+  2. **wave 1 — backend**: `k8s/envs/local/backend` — `lop-db-rw`/`lop_app` 접속은 base가 아니라
+     `k8s/envs/local/backend/kustomization.yaml`의 **patches**(`patches/*-db.yaml`, 워크로드별 strategic
+     merge)로만 주입한다(같은 이유 — base를 고치면 dev도 같이 바뀐다).
+- **dev**: (operators 앱 자체가 없음) → **wave 0 — platform**: `k8s/base/platform`을 **그대로**
+  직결 참조(postgres는 여전히 옛 Deployment) → **wave 1 — backend**: `k8s/envs/dev/backend` —
+  base를 그대로 받으므로 접속도 여전히 `postgres-service`/`postgres-secret`.
+
+  mongodb는 이 프로젝트가 GitOps로 넘어오기 전에 매니페스트에서 제거됐다 — 지금 `k8s/base/platform`에 없다.
+  `db-migrate` Job은 `PreSync` hook으로 등록되어 있어 lobby/matchmaking/room 서버 Deployment보다 먼저
+  실행되고, 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기한다
+  (sync-wave와 이중 안전장치) — 이건 local/dev 공통.
+
+  dev를 CNPG로 옮기는 절차는 `k8s/envs/dev/platform/README.md`에 적어 뒀다.
 
 ## 접속법
 
@@ -80,7 +93,7 @@ k8s/argocd/
 
 ## 배포 = 커밋 + push → 자동 sync
 
-이 레포(`k8s/base/platform`, `k8s/envs/<env>/backend`, `k8s/argocd/envs/<env>/apps`)에 변경을 커밋하고 `main`에 push하면, 그 환경을 보는 ArgoCD가 자동으로 감지해 `automated` 정책에 따라 sync한다. 수동으로 `kubectl apply`할 필요가 없다 — 클러스터에 직접 넣은 변경은 selfHeal에 의해 되돌아간다(GitOps 원칙: Git이 source of truth). `platform`은 환경 구분 없이 한 경로(`k8s/base/platform`)를 커밋하면 **두 환경 모두**에 반영된다.
+이 레포(`k8s/base/platform`, `k8s/envs/<env>/{platform,backend}`, `k8s/argocd/envs/<env>/apps`)에 변경을 커밋하고 `main`에 push하면, 그 환경을 보는 ArgoCD가 자동으로 감지해 `automated` 정책에 따라 sync한다. 수동으로 `kubectl apply`할 필요가 없다 — 클러스터에 직접 넣은 변경은 selfHeal에 의해 되돌아간다(GitOps 원칙: Git이 source of truth). `k8s/base/platform`(옛 postgres/redis/ingress/rbac)을 고치면 **두 환경 모두**에 반영되지만, CNPG(`postgres-cnpg`)·DB 접속 patch처럼 **env가 갈린 것은 그 env의 오버레이만** 바뀐다(위 "sync-wave 순서" 참고).
 
 ## 롤백 = 커밋 revert
 

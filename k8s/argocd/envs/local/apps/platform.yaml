@@ -20,3 +20,13 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      # operators 앱(wave -1)이 아직 CRD를 다 못 올렸을 때 이 앱이 먼저 평가되면 Cluster/ObjectStore/
+      # ScheduledBackup이 "리소스 종류를 모른다"로 dry-run에 걸려 멈춘다 — CRD가 늦게 생겨도
+      # 넘어가게 한다(그 뒤 selfHeal이 다시 맞춘다).
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

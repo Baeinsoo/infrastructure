@@ -39,6 +39,13 @@ spec:
         login: true
         superuser: false
         createrole: true # lop_app에 ALTER ROLE ... SET(타임아웃 등)을 걸려면 CREATEROLE + lop_app의 ADMIN OPTION 멤버십이 필요
+        # CNPG의 managed.roles 리컨실은 spec에 적힌 inRoles를 "이 롤이 멤버여야 할 목록의 전부"로 보고,
+        # 비어 있으면 DB에 실제로 걸려 있는 멤버십을 전부 REVOKE한다 — postInitApplicationSQL에서 준
+        # "lop_app WITH ADMIN OPTION" 멤버십이 리컨실 한 번에 날아간다. 그래서 여기에도 똑같이 적어야
+        # 유지된다(단 이 필드로는 ADMIN OPTION 여부를 지정할 수 없다 — 이미 ADMIN OPTION으로 걸려 있는
+        # 멤버십을 "그대로 유지"만 한다. ADMIN OPTION 자체는 postInitApplicationSQL의 GRANT가 준다).
+        inRoles:
+          - lop_app
         passwordSecret:
           name: lop-db-migrator
         comment: "마이그레이션 전용 — 앱 DB 소유자"
