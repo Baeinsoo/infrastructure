@@ -1,0 +1,35 @@
+# envFrom은 strategic merge에서 merge key가 없어 통째로 교체된다 — postgres-secret을 뺀
+# 나머지 그대로 다시 적고, env는 name으로 merge되므로 새 다섯 줄만 추가하면 된다.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lobby-server
+spec:
+  template:
+    spec:
+      containers:
+      - name: lobby-server
+        envFrom:
+        - configMapRef:
+            name: lobby-server-config
+        - secretRef:
+            name: auth-secret
+        - secretRef:
+            name: internal-api-secret
+        env:
+        - name: POSTGRES_HOST
+          value: lop-db-rw
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DATABASE
+          value: lop
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: lop-db-app-user
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: lop-db-app-user
+              key: password

@@ -1,0 +1,39 @@
+# 이미지 기본 CMD(re5nardo/lop-db-migrate — packages/database/Dockerfile)는
+# "pnpm run migrate:deploy && pnpm run seed"이고 WORKDIR은 /repo/packages/database,
+# 스키마는 그 아래 prisma/schema.prisma다(이미지를 직접 띄워 확인, 2026-10-12).
+# 그 CMD 그대로에 "마이그레이션 직전 복원점"만 앞에 얹는다. 복원점 이름은 UTC 타임스탬프
+# (kustomize images 트랜스포머가 이미지 태그를 라벨/env로 안 내놔서 커밋 단위로는 못 구분한다).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          command: ['sh', '-c', 'until nc -z lop-db-rw 5432; do echo "waiting for postgres..."; sleep 2; done']
+      containers:
+        - name: db-migrate
+          env:
+            # env는 strategic merge에서 name으로 merge된다 — 베이스의 POSTGRES_PASSWORD(postgres-secret
+            # 참조)는 안 지우면 그대로 남아 CI의 "postgres-secret 0" 단언을 깬다. 명시적으로 지운다.
+            - name: POSTGRES_PASSWORD
+              $patch: delete
+            - name: MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: lop-db-migrator
+                  key: password
+            - name: DATABASE_URL
+              value: "postgresql://lop_migrator:$(MIGRATOR_PASSWORD)@lop-db-rw:5432/lop?schema=public"
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              TAG="$(date -u +%Y%m%dT%H%M%SZ)"
+              # 배포 전 복원점 — 마이그레이션이 잘못돼도 이 이름(targetName)으로 되돌릴 수 있다.
+              # 실패해도(예: 권한 문제) 배포는 계속되게 경고만 남긴다.
+              echo "SELECT pg_create_restore_point('pre-migrate-${TAG}');" | npx prisma db execute --stdin --schema prisma/schema.prisma || echo "WARN: restore point 실패"
+              pnpm run migrate:deploy
+              pnpm run seed
