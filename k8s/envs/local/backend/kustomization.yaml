@@ -7,7 +7,7 @@ resources:
 images:
 - name: re5nardo/lobby-server
   newName: re5nardo/lobby-server
-  newTag: 3f1ca18
+  newTag: 349108e
 - name: re5nardo/lop-db-migrate
   newName: re5nardo/lop-db-migrate
   newTag: 2b58b45
@@ -21,9 +21,9 @@ configMapGenerator:
 - envs:
   - game-server-config.env
   name: game-server-config
-patches:
 # base는 옛 postgres-secret/postgres-service를 그대로 둔다(dev가 base를 직결 참조하므로
 # base를 고치면 dev도 같이 바뀐다) — DB 접속을 CNPG로 바꾸는 건 local 오버레이 패치로만.
+patches:
 - path: patches/lobby-server-db.yaml
 - path: patches/reconcile-cronjob-db.yaml
 - path: patches/matchmaking-server-db.yaml
