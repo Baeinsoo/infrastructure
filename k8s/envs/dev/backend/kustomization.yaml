@@ -20,3 +20,11 @@ configMapGenerator:
 - envs:
   - game-server-config.env
   name: game-server-config
+# 2026-10-15 dev도 CNPG lop-db로 — 연결 패치는 local과 같다(patches/ 사본).
+patches:
+- path: patches/lobby-server-db.yaml
+- path: patches/reconcile-cronjob-db.yaml
+- path: patches/matchmaking-server-db.yaml
+- path: patches/matchmaking-director-db.yaml
+- path: patches/room-server-db.yaml
+- path: patches/db-migrate-db.yaml

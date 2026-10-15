@@ -30,18 +30,24 @@ jobs:
           kubectl kustomize k8s/envs/local/backend | grep -c "name: reconcile-heartbeat$" | grep -qx 2
           kubectl kustomize k8s/envs/local/backend | grep -c "REPLACE-ME" | grep -qx 0
           kubectl kustomize k8s/envs/local/backend | grep -q "RECONCILE_HEARTBEAT_URL"
-      - name: dev 백엔드는 이번 전환으로 안 바뀌었는지
+      - name: dev도 CNPG lop-db를 보고, 백업은 꺼져 있는지
         run: |
           set -e
-          # dev는 base/backend를 patch 없이 그대로 받는다 — postgres-service/postgres-secret 그대로,
-          # lop-db-rw는 전혀 없어야 한다.
-          kubectl kustomize k8s/envs/dev/backend | grep -q "name: postgres-secret"
-          kubectl kustomize k8s/envs/dev/backend | grep -q "postgres-service"
-          kubectl kustomize k8s/envs/dev/backend | grep -c "lop-db-rw" | grep -qx 0
-          # dev엔 아직 출석 신호 시크릿이 없다(optional이라 잡은 그대로 돈다) — 실수로 끼어들면 잡는다.
-          # 1곳 = CronJob의 secretKeyRef뿐(Secret 리소스 없음)
+          # 2026-10-15 dev 전환 — 백엔드 접속은 local과 같은 7곳, 옛 postgres-secret 참조 없음.
+          count=$(kubectl kustomize k8s/envs/dev/backend | grep -o "lop-db-rw" | wc -l)
+          [ "$count" -eq 7 ] || { echo "dev lop-db-rw 참조 개수가 7이 아님: $count"; exit 1; }
+          kubectl kustomize k8s/envs/dev/backend | grep -c "name: postgres-secret" | grep -qx 0
+          # dev엔 출석 신호 시크릿이 없다(optional이라 잡은 그대로 돈다). 1곳 = CronJob의 secretKeyRef뿐
           kubectl kustomize k8s/envs/dev/backend | grep -c "name: reconcile-heartbeat$" | grep -qx 1
-      - name: base/platform에 CNPG Cluster가 안 섞여 들어갔는지 (dev 무변경 보장)
+          # dev platform: Cluster 하나, 백업 리소스·WAL 보관 플러그인 없음, 옛 postgres는 PVC만(Prune=false)
+          kubectl kustomize k8s/envs/dev/platform | grep -c "^kind: Cluster$" | grep -qx 1
+          kubectl kustomize k8s/envs/dev/platform | grep -c "^kind: ObjectStore$" | grep -qx 0
+          kubectl kustomize k8s/envs/dev/platform | grep -c "^kind: ScheduledBackup$" | grep -qx 0
+          kubectl kustomize k8s/envs/dev/platform | yq 'select(.kind=="Cluster") | .spec.plugins' | grep -qx null
+          kubectl kustomize k8s/envs/dev/platform | yq 'select(.kind=="Cluster") | .spec.managed.roles[].name' | grep -q lop_app
+          kubectl kustomize k8s/envs/dev/platform | grep -c "name: postgres-deployment" | grep -qx 0
+          kubectl kustomize k8s/envs/dev/platform | grep -c "Prune=false" | grep -qx 1
+      - name: base/platform에 CNPG Cluster가 안 섞여 들어갔는지 (오버레이만 CNPG를 끌어온다)
         run: |
           set -e
           # unanchored "kind: Cluster"는 ClusterRole/ClusterRoleBinding도 집어서 오탐한다 — 정확히

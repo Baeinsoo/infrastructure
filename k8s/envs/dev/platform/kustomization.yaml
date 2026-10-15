@@ -1,15 +1,22 @@
+# dev(iwinv) platform — 2026-10-15 CNPG로 전환(local과 같은 lop-db, 계정 lop_migrator/lop_app). 옛 데이터는 버렸다(테스트 데이터).
+# local과 다른 점: 인스턴스 1, 백업 없음(cluster-patch.yaml 참고).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: default
 resources:
   - ../../../base/platform
-  - backup-creds-secret.yaml
+  - ../../../base/platform/postgres-cnpg
 patches:
   - path: cluster-patch.yaml
     target:
       kind: Cluster
       name: lop-db
-  - path: objectstore-patch.yaml
+  - path: patches/delete-objectstore.yaml
+  - path: patches/delete-scheduledbackup.yaml
+  - path: patches/delete-old-postgres-deployment.yaml
+  - path: patches/delete-old-postgres-service.yaml
+  - path: patches/delete-old-postgres-secret.yaml
+  - path: patches/keep-old-postgres-pvc.yaml
     target:
-      kind: ObjectStore
-      name: lop-db-backup
+      kind: PersistentVolumeClaim
+      name: postgres-pvc

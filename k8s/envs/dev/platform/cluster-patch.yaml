@@ -1,6 +1,14 @@
+# dev(iwinv 단일 노드) — 인스턴스 1(노드가 하나라 복제본을 둬도 같은 디스크), 디스크 5Gi.
+# 백업은 끈다(2026-10-15): dev엔 백업 저장소가 아직 없다. WAL 보관(barman 플러그인)을 켠 채 저장소가 없으면
+# WAL이 쌓이고 클러스터가 망가진다(로컬에서 MinIO가 꺼졌을 때 실제로 그랬다). dev 데이터는 테스트용이라 버려도 된다.
+# 백업을 켜려면: 이 plugins 제거를 빼고, ObjectStore·ScheduledBackup 삭제 패치를 빼고, S3 자격증명 시크릿을 넣는다.
 - op: replace
   path: /spec/instances
-  value: 2
+  value: 1
 - op: replace
   path: /spec/storage/size
   value: 5Gi
+- op: remove
+  path: /spec/plugins
+- op: remove
+  path: /spec/postgresql/parameters/archive_timeout

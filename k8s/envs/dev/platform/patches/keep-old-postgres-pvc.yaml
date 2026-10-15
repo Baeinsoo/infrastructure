@@ -1,0 +1,6 @@
+# 옛 postgres의 데이터 볼륨. 전환(10-12) 뒤 1주 보존 — 2026-10-19 이후 수동 삭제(docs/db-operations.md §8).
+# 자동 동기가 "매니페스트에 없는 리소스"로 보고 지우지 않게 Prune=false.
+- op: add
+  path: /metadata/annotations
+  value:
+    argocd.argoproj.io/sync-options: Prune=false

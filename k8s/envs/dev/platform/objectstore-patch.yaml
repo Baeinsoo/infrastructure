@@ -1,3 +1,0 @@
-- op: replace
-  path: /spec/configuration/endpointURL
-  value: https://s3.ap-northeast-2.amazonaws.com

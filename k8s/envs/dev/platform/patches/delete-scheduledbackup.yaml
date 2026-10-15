@@ -1,0 +1,6 @@
+# dev는 백업을 끈다 — cluster-patch.yaml 머리 주석 참고.
+$patch: delete
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: lop-db-nightly
