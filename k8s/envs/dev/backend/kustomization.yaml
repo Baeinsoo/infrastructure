@@ -12,7 +12,7 @@ images:
   newTag: 0a95aad
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: 0a95aad
+  newTag: 2cb6f89
 - name: re5nardo/room-server
   newName: re5nardo/room-server
   newTag: 0a95aad
