@@ -46,8 +46,8 @@ k8s/argocd/
 | Application | local | dev |
 |---|---|---|
 | `root`(source path) | `k8s/argocd/envs/local/apps` | `k8s/argocd/envs/dev/apps` |
-| `operators`(source path) | `k8s/base/operators` | **없음** — dev는 아직 CNPG로 전환하지 않음(이 Application 자체가 dev에는 없다) |
-| `platform`(source path) | `k8s/envs/local/platform` | `k8s/base/platform` (CNPG 미적용 — 옛 postgres Deployment 그대로) |
+| `operators`(source path) | `k8s/base/operators` | `k8s/base/operators` (2026-10-15부터) |
+| `platform`(source path) | `k8s/envs/local/platform` | `k8s/envs/dev/platform` (CNPG, 인스턴스 1, 백업 없음) |
 | `backend`(source path) | `k8s/envs/local/backend` | `k8s/envs/dev/backend` |
 | destination cluster | `https://kubernetes.default.svc` (kind, 컨텍스트 `kind-lop`) | `https://kubernetes.default.svc` (iwinv k3s, `115.68.178.46`) |
 
@@ -57,7 +57,7 @@ k8s/argocd/
 
 ## sync-wave 순서
 
-**local과 dev가 여기서부터 갈린다 — dev는 이번 CNPG 전환에서 아무것도 안 바뀐다.**
+**2026-10-15부터 dev도 local과 같은 순서다.** 다른 점은 platform 오버레이뿐 — dev는 CNPG 인스턴스 1, 백업(ObjectStore·ScheduledBackup·WAL 보관) 없음(`k8s/envs/dev/platform/cluster-patch.yaml` 머리 주석).
 
 - **local**:
   0. **wave -1 — operators**: cert-manager · CloudNativePG · Barman Cloud 플러그인(`k8s/base/operators`,
@@ -70,16 +70,14 @@ k8s/argocd/
   2. **wave 1 — backend**: `k8s/envs/local/backend` — `lop-db-rw`/`lop_app` 접속은 base가 아니라
      `k8s/envs/local/backend/kustomization.yaml`의 **patches**(`patches/*-db.yaml`, 워크로드별 strategic
      merge)로만 주입한다(같은 이유 — base를 고치면 dev도 같이 바뀐다).
-- **dev**: (operators 앱 자체가 없음) → **wave 0 — platform**: `k8s/base/platform`을 **그대로**
-  직결 참조(postgres는 여전히 옛 Deployment) → **wave 1 — backend**: `k8s/envs/dev/backend` —
-  base를 그대로 받으므로 접속도 여전히 `postgres-service`/`postgres-secret`.
+- **dev**: operators(wave -1) → platform `k8s/envs/dev/platform`(wave 0) → backend `k8s/envs/dev/backend`(wave 1, `patches/*-db.yaml`은 local 사본).
+  옛 데이터는 버리고 새로 시작했다(테스트 데이터). 옛 `postgres-pvc`는 local처럼 `Prune=false`로 남아 있다.
 
   mongodb는 이 프로젝트가 GitOps로 넘어오기 전에 매니페스트에서 제거됐다 — 지금 `k8s/base/platform`에 없다.
   `db-migrate` Job은 `PreSync` hook으로 등록되어 있어 lobby/matchmaking/room 서버 Deployment보다 먼저
   실행되고, 그 안의 `wait-for-postgres` initContainer가 postgres 포트가 열릴 때까지 재차 대기한다
   (sync-wave와 이중 안전장치) — 이건 local/dev 공통.
 
-  dev를 CNPG로 옮기는 절차는 `k8s/envs/dev/platform/README.md`에 적어 뒀다.
 
 ## 접속법
 
