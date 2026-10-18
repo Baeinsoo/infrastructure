@@ -10,7 +10,7 @@ images:
   newTag: 92ba535
 - name: re5nardo/lop-db-migrate
   newName: re5nardo/lop-db-migrate
-  newTag: 2b58b45
+  newTag: 92ba535
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
   newTag: a24e797
