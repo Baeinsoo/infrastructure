@@ -13,7 +13,7 @@ images:
   newTag: 92ba535
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: "4391408"
+  newTag: 37c1d90
 - name: re5nardo/room-server
   newName: re5nardo/room-server
   newTag: 92ba535
