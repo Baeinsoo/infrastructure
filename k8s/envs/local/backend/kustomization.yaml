@@ -16,7 +16,7 @@ images:
   newTag: 90e5367
 - name: re5nardo/room-server
   newName: re5nardo/room-server
-  newTag: 515996f
+  newTag: 90c61b2
 configMapGenerator:
 - envs:
   - game-server-config.env
