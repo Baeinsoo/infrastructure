@@ -13,7 +13,7 @@ images:
   newTag: 872d6fb
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: 872d6fb
+  newTag: 83cc81e
 - name: re5nardo/room-server
   newName: re5nardo/room-server
   newTag: 872d6fb
