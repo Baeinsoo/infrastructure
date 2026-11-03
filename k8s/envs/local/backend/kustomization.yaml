@@ -13,7 +13,7 @@ images:
   newTag: 7fe7a78
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: 7fe7a78
+  newTag: 39627f8
 - name: re5nardo/room-server
   newName: re5nardo/room-server
   newTag: 7fe7a78
