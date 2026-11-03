@@ -7,16 +7,16 @@ resources:
 images:
 - name: re5nardo/lobby-server
   newName: re5nardo/lobby-server
-  newTag: 872d6fb
+  newTag: 1c1076f
 - name: re5nardo/lop-db-migrate
   newName: re5nardo/lop-db-migrate
-  newTag: 872d6fb
+  newTag: 1c1076f
 - name: re5nardo/matchmaking-server
   newName: re5nardo/matchmaking-server
-  newTag: 83cc81e
+  newTag: de5b0c3
 - name: re5nardo/room-server
   newName: re5nardo/room-server
-  newTag: 872d6fb
+  newTag: 1c1076f
 configMapGenerator:
 - envs:
   - game-server-config.env
